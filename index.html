@@ -43,6 +43,20 @@ html,body{height:100%;font-family:'Inter',-apple-system,sans-serif;
   --r-sm:14px;
 }
 body{background:var(--bg);color:var(--text);}
+
+/* ── Light mode override — same accent colors, swapped base surfaces ── */
+html[data-theme="light"]{
+  --bg:#F5F3EF;
+  --card:#FFFFFF;
+  --card2:#EDEAE3;
+  --glass:rgba(0,0,0,0.045);
+  --border:rgba(0,0,0,0.1);
+  --glow:rgba(197,165,114,0.18);
+  --text:#1C1A22;
+  --sub:#5B5770;
+  --muted:#8B8798;
+}
+html[data-theme="light"] .verse-screen{background:#16141E !important;} /* verse splash stays dark/dramatic in both modes */
 #app{height:100vh;height:100dvh;overflow:hidden;display:flex;flex-direction:column;
   background:var(--bg);padding-top:env(safe-area-inset-top,0px);}
 .scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:14px 14px 20px;}
@@ -733,8 +747,32 @@ function setupPush(parentDocId){
   });
 }
 
+function getInitialTheme(){
+  var saved=null;
+  try{saved=localStorage.getItem('theme');}catch(e){}
+  if(saved==='light'||saved==='dark') return saved;
+  // No explicit choice yet — follow the system/iOS setting, same as the locked design brief.
+  return (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+}
+
+function applyTheme(){
+  document.documentElement.setAttribute('data-theme', S.theme);
+  var metaTheme=document.querySelector('meta[name="theme-color"]');
+  if(metaTheme) metaTheme.setAttribute('content', S.theme==='light' ? '#F5F3EF' : '#16141E');
+  var btn=document.getElementById('theme-btn');
+  if(btn) btn.textContent = S.theme==='light' ? '🌙' : '☀️';
+  var tog=document.getElementById('pf-theme-tog');
+  if(tog) tog.classList.toggle('on', S.theme==='dark'); // switch is framed as "Dark Mode" in Settings
+}
+
+function toggleTheme(){
+  S.theme = S.theme==='light' ? 'dark' : 'light';
+  try{localStorage.setItem('theme', S.theme);}catch(e){}
+  applyTheme();
+}
+
 var S={
-  scr:'verse',tab:'home',goalsTab:'cat',curCat:'athletics',
+  scr:'verse',tab:'home',goalsTab:'cat',curCat:'athletics',theme:getInitialTheme(),
   goalType:'once',freqN:3,hor:'yearly',picked:null,addedTitle:'',
   pin:'1234',
   verse:{text:'I can do all things through Christ who strengthens me.', ref:'Philippians 4:13 · NIV'},
@@ -753,9 +791,13 @@ var S={
     {id:'g3',t:'Attend all summer practices',  pct:100,done:true, hor:'Monthly',cat:'athletics'},
     {id:'g4',t:'Read through the book of John',pct:50, done:false,hor:'Monthly',cat:'faith'},
     {id:'g5',t:'Memorize a verse a week',       pct:100,done:true, hor:'Weekly', cat:'faith'},
-    {id:'g6',t:'Bring my grade up in math',     pct:0,  done:false,hor:'Monthly',cat:'academics'},
-    {id:'g7',t:'Read 20 pages a week',          pct:66, done:false,hor:'Weekly', cat:'academics'},
-    {id:'g8',t:'Learn a new song for the fall concert',pct:75,done:false,hor:'Monthly',cat:'creative'},
+    {id:'g6',t:'Pray before every meal this week',pct:40,done:false,hor:'Weekly', cat:'faith'},
+    {id:'g7',t:'Bring my grade up in math',     pct:0,  done:false,hor:'Monthly',cat:'academics'},
+    {id:'g8',t:'Read 20 pages a week',          pct:66, done:false,hor:'Weekly', cat:'academics'},
+    {id:'g9',t:'Turn in every assignment on time this month',pct:100,done:true,hor:'Monthly',cat:'academics'},
+    {id:'g10',t:'Learn a new song for the fall concert',pct:75,done:false,hor:'Monthly',cat:'creative'},
+    {id:'g11',t:'Practice my part every day this week',pct:30,done:false,hor:'Weekly', cat:'creative'},
+    {id:'g12',t:'Try out for first chair',      pct:100,done:true, hor:'Yearly', cat:'creative'},
   ],
 };
 
@@ -779,6 +821,7 @@ function render(){
   else if(S.scr==='pdash') h=sParentDash();
   app.innerHTML=h;
   bind();
+  applyTheme();
   if(S.scr==='verse') setTimeout(function(){var b=document.getElementById('vbtn');if(b)b.style.opacity='1';},2500);
 }
 
@@ -1446,8 +1489,8 @@ function showProfile(){
     '<div class="scroll fin" id="pf-settings" style="display:none;padding-top:14px">'+
       '<div class="sec">Display</div>'+
       '<div class="toggle-row"><div class="settings-ico">🌙</div><div class="toggle-body">'+
-        '<div class="toggle-lbl">Dark Mode</div><div class="toggle-sub">Follows your phone\'s system setting</div></div>'+
-        '<div class="toggle-sw on" id="pf-theme-tog"></div></div>'+
+        '<div class="toggle-lbl">Dark Mode</div><div class="toggle-sub">Tap to switch — defaults to your phone\'s system setting</div></div>'+
+        '<div class="toggle-sw'+(S.theme==='dark'?' on':'')+'" id="pf-theme-tog"></div></div>'+
       '<div class="sec">Active Sports</div>'+
       '<div class="season-card"><div style="font-family:Barlow Condensed,sans-serif;font-size:13px;font-weight:800;color:#4A90D9;margin-bottom:8px">⚽ Soccer is pinned year-round</div>'+
         '<div style="font-size:12px;color:#9B97B0;margin-bottom:12px;line-height:1.5">Toggle your other sports based on what\'s in season. Only active sports show goals and earn XP.</div>'+
@@ -1485,7 +1528,7 @@ function showProfile(){
       arr.classList.toggle('open',!open);
     };
   });
-  var tt=document.getElementById('pf-theme-tog'); if(tt) tt.onclick=function(){tt.classList.toggle('on');};
+  var tt=document.getElementById('pf-theme-tog'); if(tt) tt.onclick=toggleTheme;
   ov.querySelectorAll('.sport-chip').forEach(function(chip){
     if(chip.textContent.trim().indexOf('Soccer')>-1) return; // pinned, not toggleable
     chip.onclick=function(){chip.classList.toggle('on');chip.classList.toggle('off');};
@@ -1502,7 +1545,7 @@ function bind(){
   var cr=document.getElementById('copy-rpt');if(cr) cr.onclick=function(){toast('Report copied!','#C5A572');};
   var cpb=document.getElementById('change-pin-btn');if(cpb) cpb.onclick=showChangePin;
   var avb=document.getElementById('avatar-btn');if(avb) avb.onclick=showProfile;
-  var tb=document.getElementById('theme-btn');if(tb) tb.onclick=function(){toast('Light mode in the full build!','#C5A572');};
+  var tb=document.getElementById('theme-btn');if(tb) tb.onclick=toggleTheme;
 
   app.querySelectorAll('[data-tab]').forEach(function(el){el.onclick=function(){S.tab=el.dataset.tab;go('main');};});
   app.querySelectorAll('[data-go]').forEach(function(el){el.onclick=function(){if(el.dataset.cat) S.curCat=el.dataset.cat;go(el.dataset.go);};});
