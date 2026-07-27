@@ -1031,7 +1031,7 @@ function sCatDetail(){
   var goals=S.goals.filter(function(g){return g.cat===key;});
   var done=goals.filter(function(g){return g.done;}).length;
   var glist=goals.map(function(g,i){
-    return '<div class="g-card" data-editg="'+i+'">'+
+    return '<div class="g-card" data-editg="'+g.id+'">'+
       '<div class="g-dot'+(g.done?' done':'')+'"></div>'+
       '<div style="flex:1"><div class="g-title'+(g.done?' done':'')+'">'+esc(g.t)+'</div>'+
         (g.done?'<div class="g-meta">Completed ✓</div>':
@@ -1316,6 +1316,66 @@ function sParentDash(){
     '</div>'+nav()+'</div>';
 }
 
+function showEditGoal(id){
+  var g=S.goals.find(function(x){return x.id===id;});
+  if(!g) return;
+  var c=CATS[g.cat]||CATS.athletics;
+  var ov=document.createElement('div');
+  ov.className='pin-overlay';
+  document.body.appendChild(ov);
+
+  function draw(){
+    ov.innerHTML='<div class="pin-modal" style="text-align:left;max-width:340px">'+
+      '<button class="pin-x" id="egx">✕</button>'+
+      '<div style="font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:'+c.clr+';margin-bottom:6px">'+c.ico+' '+c.l+'</div>'+
+      '<input id="eg-title" class="f-area" style="min-height:auto;height:44px;margin-bottom:14px" value="'+esc(g.t)+'">'+
+      (g.hor==='Yearly'||g.hor==='Monthly'||g.hor==='Weekly'?
+        '<div style="font-size:11px;color:var(--muted);margin-bottom:14px">'+g.hor+' goal</div>':'')+
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'+
+        '<label style="font-size:13px;color:var(--text);flex:1;display:flex;align-items:center;gap:8px;cursor:pointer">'+
+          '<input type="checkbox" id="eg-done" '+(g.done?'checked':'')+' style="width:20px;height:20px"> Mark as completed'+
+        '</label>'+
+      '</div>'+
+      '<div id="eg-pct-wrap" style="'+(g.done?'opacity:.4;pointer-events:none':'')+'">'+
+        '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px">'+
+          '<span>Progress</span><span id="eg-pct-lbl">'+g.pct+'%</span></div>'+
+        '<input type="range" id="eg-pct" min="0" max="100" value="'+g.pct+'" style="width:100%;margin-bottom:16px">'+
+      '</div>'+
+      '<button class="btn btn-red" id="eg-save" style="margin-bottom:8px">Save Changes</button>'+
+      '<button class="btn btn-ghost" id="eg-delete">🗑 Delete Goal</button>'+
+    '</div>';
+
+    document.getElementById('egx').onclick=function(){ov.remove();};
+    var doneChk=document.getElementById('eg-done');
+    var pctWrap=document.getElementById('eg-pct-wrap');
+    var pctInput=document.getElementById('eg-pct');
+    var pctLbl=document.getElementById('eg-pct-lbl');
+    doneChk.onchange=function(){pctWrap.style.opacity=doneChk.checked?'.4':'1';pctWrap.style.pointerEvents=doneChk.checked?'none':'auto';};
+    pctInput.oninput=function(){pctLbl.textContent=pctInput.value+'%';};
+
+    document.getElementById('eg-save').onclick=function(){
+      var title=document.getElementById('eg-title').value.trim();
+      if(!title) return;
+      g.t=title;
+      g.done=doneChk.checked;
+      g.pct=doneChk.checked?100:parseInt(pctInput.value,10);
+      fbSaveState();
+      toast('Goal updated ✓','#30D158');
+      ov.remove();
+      render();
+    };
+    document.getElementById('eg-delete').onclick=function(){
+      if(!confirm('Delete this goal?')) return;
+      S.goals=S.goals.filter(function(x){return x.id!==id;});
+      fbSaveState();
+      toast('Goal deleted','#EF4444');
+      ov.remove();
+      render();
+    };
+  }
+  draw();
+}
+
 function showChangePin(){
   var step='current', cur='', next='', confirmPin='';
   var ov=document.createElement('div');
@@ -1560,7 +1620,7 @@ function bind(){
     el.onclick=function(){S.picked=el.dataset.pick;S.addedTitle=el.dataset.etxt||'';render();};
   });
   app.querySelectorAll('[data-editg]').forEach(function(el){
-    el.onclick=function(){toast('Full goal editing in the real build','#C5A572');};
+    el.onclick=function(){showEditGoal(el.dataset.editg);};
   });
 
   app.querySelectorAll('[data-tog]').forEach(function(el){
