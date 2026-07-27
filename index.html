@@ -1080,8 +1080,9 @@ function sHabits(){
     '</div>';
   }).join('');
   var manage=S.habits.map(function(h){
-    return '<div class="hab-manage"><span style="flex:1;font-size:13px;color:var(--text)">'+esc(h.lbl)+'</span>'+
-      '<span style="font-size:9px;color:var(--muted);font-family:Barlow Condensed,sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:.06em">Daily</span></div>';
+    return '<div class="hab-manage" data-edithab="'+h.id+'" style="cursor:pointer"><span style="flex:1;font-size:13px;color:var(--text)">'+esc(h.lbl)+'</span>'+
+      '<span style="font-size:9px;color:var(--muted);font-family:Barlow Condensed,sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:.06em">'+esc(h.cat||'Daily')+'</span>'+
+      '<span class="g-chev" style="margin-left:8px">›</span></div>';
   }).join('');
 
   return '<div class="page-hd">'+
@@ -1100,7 +1101,7 @@ function sHabits(){
       '<div class="hab-manage" style="opacity:.4"><span style="flex:1;font-size:13px;color:var(--text)">Take out recycling</span><span style="font-size:9px;color:#F59E0B;font-family:Barlow Condensed,sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:.06em">Thursday</span></div>'+
       '<div class="sec" style="margin-top:20px">Manage</div>'+manage+
       '<div class="gap2"></div>'+
-      '<button class="btn" style="background:linear-gradient(135deg,#F59E0B,#E08C00);color:#16141E;font-family:Barlow Condensed,sans-serif;font-size:17px;font-weight:800;letter-spacing:.06em">+ Add Habit</button>'+
+      '<button class="btn" id="add-habit-btn" style="background:linear-gradient(135deg,#F59E0B,#E08C00);color:#16141E;font-family:Barlow Condensed,sans-serif;font-size:17px;font-weight:800;letter-spacing:.06em">+ Add Habit</button>'+
     '</div>';
 }
 
@@ -1314,6 +1315,75 @@ function sParentDash(){
       '<div class="gap"></div>'+
       '<button class="btn btn-ghost" id="change-pin-btn">🔑 Change PIN</button>'+
     '</div>'+nav()+'</div>';
+}
+
+function showHabitForm(id){
+  var editing=!!id;
+  var h=editing?S.habits.find(function(x){return x.id===id;}):null;
+  var swatches=[
+    {clr:'#C5A572',n:'Gold'},{clr:'#C41E3A',n:'Red'},{clr:'#4A90D9',n:'Blue'},
+    {clr:'#9B72CF',n:'Purple'},{clr:'#F59E0B',n:'Amber'},{clr:'#30D158',n:'Green'}
+  ];
+  var pickedClr=(h&&h.clr)||swatches[4].clr;
+
+  var ov=document.createElement('div');
+  ov.className='pin-overlay';
+  document.body.appendChild(ov);
+
+  function draw(){
+    ov.innerHTML='<div class="pin-modal" style="text-align:left;max-width:340px">'+
+      '<button class="pin-x" id="hfx">✕</button>'+
+      '<div style="font-family:Barlow Condensed,sans-serif;font-size:22px;font-weight:800;color:var(--text);margin-bottom:14px">'+(editing?'Edit Habit':'Add Habit')+'</div>'+
+      '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">What&rsquo;s the habit?</div>'+
+      '<input id="hf-lbl" class="f-area" style="min-height:auto;height:44px;margin-bottom:12px" placeholder="e.g. Make my bed" value="'+esc(h?h.lbl:'')+'">'+
+      '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">Tag (optional)</div>'+
+      '<input id="hf-cat" class="f-area" style="min-height:auto;height:44px;margin-bottom:12px" placeholder="e.g. Soccer, School, Habits" value="'+esc(h?h.cat:'')+'">'+
+      '<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Color</div>'+
+      '<div style="display:flex;gap:8px;margin-bottom:18px" id="hf-swatches">'+
+        swatches.map(function(s){
+          return '<div data-clr="'+s.clr+'" style="width:32px;height:32px;border-radius:50%;background:'+s.clr+';cursor:pointer;'+
+            'border:3px solid '+(s.clr===pickedClr?'var(--text)':'transparent')+'"></div>';
+        }).join('')+
+      '</div>'+
+      '<button class="btn btn-red" id="hf-save" style="margin-bottom:8px">'+(editing?'Save Changes':'Add Habit')+'</button>'+
+      (editing?'<button class="btn btn-ghost" id="hf-delete">🗑 Delete Habit</button>':'')+
+    '</div>';
+
+    document.getElementById('hfx').onclick=function(){ov.remove();};
+    ov.querySelectorAll('[data-clr]').forEach(function(sw){
+      sw.onclick=function(){
+        pickedClr=sw.dataset.clr;
+        ov.querySelectorAll('[data-clr]').forEach(function(s2){
+          s2.style.border='3px solid '+(s2.dataset.clr===pickedClr?'var(--text)':'transparent');
+        });
+      };
+    });
+    document.getElementById('hf-save').onclick=function(){
+      var lbl=document.getElementById('hf-lbl').value.trim();
+      if(!lbl) return;
+      var cat=document.getElementById('hf-cat').value.trim()||'Habits';
+      if(editing){
+        h.lbl=lbl;h.cat=cat;h.clr=pickedClr;
+        toast('Habit updated ✓','#30D158');
+      }else{
+        S.habits.push({id:'h'+Date.now(),lbl:lbl,cat:cat,clr:pickedClr,done:false});
+        toast('Habit added 💪','#30D158');
+      }
+      fbSaveState();
+      ov.remove();
+      render();
+    };
+    var del=document.getElementById('hf-delete');
+    if(del) del.onclick=function(){
+      if(!confirm('Delete this habit?')) return;
+      S.habits=S.habits.filter(function(x){return x.id!==id;});
+      fbSaveState();
+      toast('Habit deleted','#EF4444');
+      ov.remove();
+      render();
+    };
+  }
+  draw();
 }
 
 function showEditGoal(id){
@@ -1621,6 +1691,11 @@ function bind(){
   });
   app.querySelectorAll('[data-editg]').forEach(function(el){
     el.onclick=function(){showEditGoal(el.dataset.editg);};
+  });
+  var addHabitBtn=document.getElementById('add-habit-btn');
+  if(addHabitBtn) addHabitBtn.onclick=function(){showHabitForm(null);};
+  app.querySelectorAll('[data-edithab]').forEach(function(el){
+    el.onclick=function(){showHabitForm(el.dataset.edithab);};
   });
 
   app.querySelectorAll('[data-tog]').forEach(function(el){
