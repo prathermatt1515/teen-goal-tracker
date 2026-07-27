@@ -640,9 +640,10 @@ function fbLoadState(){
     if(snap.exists){
       var d=snap.data();
       // Merge saved fields onto defaults without clobbering local-only UI state (scr/tab/etc.)
-      ['streak','xp','xpMax','habits','goals','dayHabits','identity','activeSports'].forEach(function(k){
+      ['streak','xp','xpMax','habits','goals','dayHabits','identity','activeSports','seasonYear','seasonHistory'].forEach(function(k){
         if(d[k]!==undefined) S[k]=d[k];
       });
+      checkSeasonRollover();
       render();
     }else{
       fbSaveState(); // first run — seed Firestore with the defaults below
@@ -662,7 +663,7 @@ function fbListenState(){
   db.doc(window.APP_CONFIG.docIds.nolanState).onSnapshot(function(snap){
     if(!snap.exists) return;
     var d=snap.data();
-    ['streak','xp','xpMax','habits','goals','dayHabits','identity','activeSports'].forEach(function(k){
+    ['streak','xp','xpMax','habits','goals','dayHabits','identity','activeSports','seasonYear','seasonHistory'].forEach(function(k){
       if(d[k]!==undefined) S[k]=d[k];
     });
     if(S.scr==='main') render();
@@ -674,7 +675,7 @@ function fbSaveState(){
   clearTimeout(saveTimer);
   saveTimer=setTimeout(function(){
     db.doc(window.APP_CONFIG.docIds.nolanState).set({
-      streak:S.streak, xp:S.xp, xpMax:S.xpMax, habits:S.habits, goals:S.goals, dayHabits:S.dayHabits, identity:S.identity, activeSports:S.activeSports,
+      streak:S.streak, xp:S.xp, xpMax:S.xpMax, habits:S.habits, goals:S.goals, dayHabits:S.dayHabits, identity:S.identity, activeSports:S.activeSports, seasonYear:S.seasonYear, seasonHistory:S.seasonHistory,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     },{merge:true}).catch(function(e){console.error('Save state failed',e);});
   },400); // debounce so rapid taps don't spam writes
@@ -792,12 +793,15 @@ var S={
   identity:{goal:'',obstacle:'',becoming:''},
   activeSports:{soccer:true,baseball:true,basketball:false,crosscountry:false,track:false,golf:true},
   curSport:'soccer',
+  seasonYear:new Date().getFullYear(),
+  seasonHistory:[],
+  wrapStep:'summary',wrapGoalIds:[],wrapIndex:0,wrapDecisions:{},wrapSnapshot:null,
   pin:'1234',
   verse:{text:'I can do all things through Christ who strengthens me.', ref:'Philippians 4:13 · NIV'},
-  streak:7,xp:340,xpMax:3000,
+  streak:0,xp:0,xpMax:3000,
   habits:[
-    {id:'h1',lbl:'Read my Bible',         cat:'Faith', clr:'#C5A572',done:true},
-    {id:'h2',lbl:'Make my bed',           cat:'Habits',clr:'#F59E0B',done:true},
+    {id:'h1',lbl:'Read my Bible',         cat:'Faith', clr:'#C5A572',done:false},
+    {id:'h2',lbl:'Make my bed',           cat:'Habits',clr:'#F59E0B',done:false},
     {id:'h3',lbl:'Foot skills — 20 min',  cat:'Soccer',clr:'#C41E3A',done:false},
     {id:'h4',lbl:'Homework before dinner',cat:'School',clr:'#4A90D9',done:false},
     {id:'h5',lbl:'Read 30 minutes',       cat:'Habits',clr:'#F59E0B',done:false},
@@ -808,22 +812,22 @@ var S={
     {id:'d2',lbl:'Take out recycling',   day:'Thursday',clr:'#F59E0B',done:false},
   ],
   goals:[
-    // Faith — full chain, completed, to demonstrate what a finished cascade looks like
+    // Faith
     {id:'g1',t:'Read through the whole Bible this year',pct:0,done:false,hor:'Yearly', cat:'faith',parentId:null},
     {id:'g2',t:'Read through the book of John',         pct:0,done:false,hor:'Monthly',cat:'faith',parentId:'g1'},
-    {id:'g3',t:'Read your Bible before you pick up your phone',pct:100,done:true,hor:'Weekly',cat:'faith',parentId:'g2'},
-    // Academics — in progress
+    {id:'g3',t:'Read your Bible before you pick up your phone',pct:0,done:false,hor:'Weekly',cat:'faith',parentId:'g2'},
+    // Academics
     {id:'g4',t:'Set a grade target worth working for', pct:0,done:false,hor:'Yearly', cat:'academics',parentId:null},
     {id:'g5',t:'Tackle the assignment you have been avoiding',pct:0,done:false,hor:'Monthly',cat:'academics',parentId:'g4'},
-    {id:'g6',t:'Start homework before dinner every day this week',pct:60,done:false,hor:'Weekly',cat:'academics',parentId:'g5'},
-    // Athletics — in progress
+    {id:'g6',t:'Start homework before dinner every day this week',pct:0,done:false,hor:'Weekly',cat:'academics',parentId:'g5'},
+    // Athletics
     {id:'g7',t:'Make the N1 team',                     pct:0,done:false,hor:'Yearly', cat:'athletics',parentId:null,sport:'soccer'},
     {id:'g8',t:'Improve first touch',                  pct:0,done:false,hor:'Monthly',cat:'athletics',parentId:'g7',sport:'soccer'},
-    {id:'g9',t:'Get extra reps outside of practice this week',pct:40,done:false,hor:'Weekly',cat:'athletics',parentId:'g8',sport:'soccer'},
-    // Creative — in progress
+    {id:'g9',t:'Get extra reps outside of practice this week',pct:0,done:false,hor:'Weekly',cat:'athletics',parentId:'g8',sport:'soccer'},
+    // Creative
     {id:'g10',t:'Earn first chair by the end of the year',pct:0,done:false,hor:'Yearly', cat:'creative',parentId:null},
     {id:'g11',t:'Learn a new song for the fall concert',pct:0,done:false,hor:'Monthly',cat:'creative',parentId:'g10'},
-    {id:'g12',t:'Practice my part every day this week', pct:30,done:false,hor:'Weekly',cat:'creative',parentId:'g11'},
+    {id:'g12',t:'Practice my part every day this week', pct:0,done:false,hor:'Weekly',cat:'creative',parentId:'g11'},
   ],
 };
 
@@ -845,6 +849,7 @@ function render(){
   else if(S.scr==='catdetail') h=sCatDetail();
   else if(S.scr==='addg')  h=sAddGoal();
   else if(S.scr==='pdash') h=sParentDash();
+  else if(S.scr==='seasonwrap') h=sSeasonWrap();
   app.innerHTML=h;
   bind();
   applyTheme();
@@ -951,6 +956,111 @@ function sHome(){
     '</div>'+
 
   '</div>';
+}
+
+function goalSubtree(id){
+  var out=[id];
+  goalChildren(id).forEach(function(c){out=out.concat(goalSubtree(c.id));});
+  return out;
+}
+function levelNameForXp(xp){
+  var thresholds=[[75000,'Legend'],[52000,'MVP'],[28000,'All-Star'],[12000,'Pro'],[3000,'Prospect'],[0,'Amateur']];
+  for(var i=0;i<thresholds.length;i++){ if(xp>=thresholds[i][0]) return thresholds[i][1]; }
+  return 'Amateur';
+}
+function checkSeasonRollover(){
+  if(S.wrapSnapshot) return; // already mid-flow, don't reset progress through it
+  var realYear=new Date().getFullYear();
+  if(realYear<=S.seasonYear) return;
+  // Snapshot the season that's ending, before anything resets.
+  S.wrapSnapshot={
+    year:S.seasonYear,
+    finalXp:S.xp,
+    finalLevel:levelNameForXp(S.xp),
+    streakAtEnd:S.streak,
+    goalsCompleted:S.goals.filter(function(g){return goalIsDone(g);}).length
+  };
+  // Top-level goals (no parent) that are NOT done need a human decision.
+  // Completed top-level goals archive automatically, no need to ask.
+  S.wrapGoalIds=S.goals.filter(function(g){return !g.parentId && !goalIsDone(g);}).map(function(g){return g.id;});
+  S.wrapIndex=0;
+  S.wrapStep='summary';
+  S.wrapDecisions={};
+  S.scr='seasonwrap';
+}
+
+function finalizeSeasonRollover(){
+  var snap=S.wrapSnapshot;
+  var newYear=snap.year+1;
+  var keepIds={}; // ids of goals (and their subtrees) that survive into the new season
+  var archivedGoals=[];
+
+  S.goals.filter(function(g){return !g.parentId;}).forEach(function(g){
+    var subtreeIds=goalSubtree(g.id);
+    var subtreeGoals=S.goals.filter(function(x){return subtreeIds.indexOf(x.id)>-1;});
+    var carry=goalIsDone(g) ? false : (S.wrapDecisions[g.id]==='carry');
+    if(carry){
+      subtreeIds.forEach(function(id){keepIds[id]=true;});
+    }else{
+      archivedGoals=archivedGoals.concat(subtreeGoals.map(function(x){
+        return {t:x.t,hor:x.hor,cat:x.cat,completed:goalIsDone(x)};
+      }));
+    }
+  });
+
+  // Carried goals restart at 0% for the new season — fresh push, same target.
+  S.goals=S.goals.filter(function(g){return keepIds[g.id];}).map(function(g){
+    return Object.assign({},g,{pct:0,done:false});
+  });
+
+  S.seasonHistory.push({
+    year:snap.year,
+    finalXp:snap.finalXp,
+    finalLevel:snap.finalLevel,
+    streakAtEnd:snap.streakAtEnd,
+    goalsCompleted:snap.goalsCompleted,
+    archivedGoals:archivedGoals
+  });
+
+  S.seasonYear=newYear;
+  S.xp=0;
+  S.wrapSnapshot=null;
+  S.scr='main';
+  S.tab='home';
+  fbSaveState();
+  render();
+}
+
+function sSeasonWrap(){
+  var snap=S.wrapSnapshot;
+  if(S.wrapStep==='summary'){
+    return '<div style="display:flex;flex-direction:column;height:100%;align-items:center;justify-content:center;padding:32px;text-align:center;background:var(--bg)">'+
+      '<div style="font-size:52px;margin-bottom:16px">🏆</div>'+
+      '<div style="font-family:Barlow Condensed,sans-serif;font-size:28px;font-weight:800;color:var(--gold);margin-bottom:8px">Season '+snap.year+' Complete!</div>'+
+      '<div style="font-size:13px;color:var(--sub);margin-bottom:28px;line-height:1.6">Here&rsquo;s where you landed. This becomes a permanent badge — nothing is lost.</div>'+
+      '<div class="commit-card" style="width:100%;max-width:320px;margin-bottom:24px">'+
+        '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span style="color:var(--sub);font-size:13px">Final Level</span><span style="font-weight:800;color:var(--gold)">'+snap.finalLevel+'</span></div>'+
+        '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span style="color:var(--sub);font-size:13px">Total XP</span><span style="font-weight:800;color:var(--text)">'+snap.finalXp+'</span></div>'+
+        '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span style="color:var(--sub);font-size:13px">Streak at end</span><span style="font-weight:800;color:#F59E0B">'+snap.streakAtEnd+' days</span></div>'+
+        '<div style="display:flex;justify-content:space-between;padding:8px 0"><span style="color:var(--sub);font-size:13px">Goals completed</span><span style="font-weight:800;color:#30D158">'+snap.goalsCompleted+'</span></div>'+
+      '</div>'+
+      '<button class="btn btn-red" id="wrap-continue" style="width:100%;max-width:320px">'+(S.wrapGoalIds.length?'Continue → Unfinished Goals':'Start '+(snap.year+1))+'</button>'+
+    '</div>';
+  }
+  if(S.wrapStep==='goals'){
+    var gid=S.wrapGoalIds[S.wrapIndex];
+    var g=S.goals.find(function(x){return x.id===gid;});
+    var c=CATS[g.cat];
+    return '<div style="display:flex;flex-direction:column;height:100%;align-items:center;justify-content:center;padding:32px;text-align:center;background:var(--bg)">'+
+      '<div style="font-size:11px;color:var(--muted);margin-bottom:16px">Unfinished goal '+(S.wrapIndex+1)+' of '+S.wrapGoalIds.length+'</div>'+
+      '<div style="font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:'+c.clr+';margin-bottom:8px">'+c.ico+' '+c.l+' · '+g.hor+'</div>'+
+      '<div style="font-family:Barlow Condensed,sans-serif;font-size:22px;font-weight:800;color:var(--text);margin-bottom:28px;max-width:300px">'+esc(g.t)+'</div>'+
+      '<div style="font-size:13px;color:var(--sub);margin-bottom:20px">Carry this into '+(snap.year+1)+'?</div>'+
+      '<button class="btn btn-red" id="wrap-carry" style="width:100%;max-width:280px;margin-bottom:10px">Yes, carry it forward</button>'+
+      '<button class="btn btn-ghost" id="wrap-archive" style="width:100%;max-width:280px">Archive it</button>'+
+    '</div>';
+  }
+  return '';
 }
 
 function goalChildren(id){
@@ -1349,6 +1459,17 @@ function sStats(){
       '<div class="sec">Season Report Card</div><div class="card"><div class="report-card">'+reportCard+'</div></div>'+
       '<div class="sec">Badges Earned</div><div class="badges-grid">'+badgesHtml+'</div>'+
       '<div class="sec">Level Progression</div><div class="card" style="padding:0;overflow:hidden">'+levels+'</div>'+
+      (S.seasonHistory.length?
+        '<div class="sec">Season History</div>'+S.seasonHistory.slice().reverse().map(function(s){
+          return '<div class="commit-card" style="margin-bottom:8px">'+
+            '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">'+
+              '<div style="font-family:Barlow Condensed,sans-serif;font-size:16px;font-weight:800;color:var(--gold)">Season '+s.year+'</div>'+
+              '<div style="font-size:11px;color:var(--muted)">'+s.finalLevel+'</div>'+
+            '</div>'+
+            '<div style="font-size:12px;color:var(--sub)">'+s.finalXp+' XP · '+s.streakAtEnd+'-day streak at end · '+s.goalsCompleted+' goals completed</div>'+
+          '</div>';
+        }).join('')
+        :'')+
     '</div>';
 }
 
@@ -1979,6 +2100,23 @@ function bind(){
   var cr=document.getElementById('copy-rpt');if(cr) cr.onclick=function(){toast('Report copied!','#C5A572');};
   var cpb=document.getElementById('change-pin-btn');if(cpb) cpb.onclick=showChangePin;
   var avb=document.getElementById('avatar-btn');if(avb) avb.onclick=showProfile;
+  var wc=document.getElementById('wrap-continue');
+  if(wc) wc.onclick=function(){
+    if(S.wrapGoalIds.length){ S.wrapStep='goals'; S.wrapIndex=0; render(); }
+    else{ finalizeSeasonRollover(); }
+  };
+  var wcarry=document.getElementById('wrap-carry');
+  if(wcarry) wcarry.onclick=function(){
+    S.wrapDecisions[S.wrapGoalIds[S.wrapIndex]]='carry';
+    S.wrapIndex++;
+    if(S.wrapIndex>=S.wrapGoalIds.length) finalizeSeasonRollover(); else render();
+  };
+  var warchive=document.getElementById('wrap-archive');
+  if(warchive) warchive.onclick=function(){
+    S.wrapDecisions[S.wrapGoalIds[S.wrapIndex]]='archive';
+    S.wrapIndex++;
+    if(S.wrapIndex>=S.wrapGoalIds.length) finalizeSeasonRollover(); else render();
+  };
   var tb=document.getElementById('theme-btn');if(tb) tb.onclick=toggleTheme;
 
   app.querySelectorAll('[data-tab]').forEach(function(el){el.onclick=function(){S.tab=el.dataset.tab;go('main');};});
@@ -2054,6 +2192,7 @@ function bind(){
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
 
+checkSeasonRollover();
 render();
 fetchDailyVerse();
 fbInit();
