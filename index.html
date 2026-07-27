@@ -207,7 +207,7 @@ html[data-theme="light"] .verse-screen{background:#16141E !important;} /* verse 
 .t-cnt{font-size:10px;color:var(--muted);}
 .t-card{background:var(--card);border-radius:18px;border-left:4px solid var(--tc);
   padding:14px 16px;margin-bottom:8px;border:1.5px solid rgba(var(--overlay-rgb),.07);
-  border-left:4px solid var(--tc);}
+  border-left:4px solid var(--tc);cursor:pointer;}
 .tc-top{display:flex;align-items:flex-start;gap:10px;}
 .tc-icon{font-size:18px;flex-shrink:0;margin-top:2px;}
 .tc-title{font-size:14px;font-weight:500;color:var(--text);line-height:1.35;flex:1;}
@@ -215,6 +215,7 @@ html[data-theme="light"] .verse-screen{background:#16141E !important;} /* verse 
   color:var(--tc);margin-top:5px;}
 .tc-bar{height:4px;background:rgba(var(--overlay-rgb),.08);border-radius:4px;overflow:hidden;margin-top:8px;}
 .tc-fill{height:100%;border-radius:4px;}
+.tc-sub{font-size:10px;color:var(--muted);margin-top:5px;font-style:italic;}
 .freq-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:6px;
   background:rgba(74,144,217,.15);border:1px solid rgba(74,144,217,.25);color:var(--blue);
   font-size:9px;font-weight:800;font-family:'Barlow Condensed',sans-serif;
@@ -784,7 +785,7 @@ function toggleTheme(){
 
 var S={
   scr:'verse',tab:'home',goalsTab:'cat',curCat:'athletics',theme:getInitialTheme(),
-  goalType:'once',freqN:3,hor:'yearly',picked:null,addedTitle:'',
+  goalType:'once',freqN:3,hor:'yearly',picked:null,addedTitle:'',linkParent:null,
   pin:'1234',
   verse:{text:'I can do all things through Christ who strengthens me.', ref:'Philippians 4:13 · NIV'},
   streak:7,xp:340,xpMax:3000,
@@ -801,18 +802,22 @@ var S={
     {id:'d2',lbl:'Take out recycling',   day:'Thursday',clr:'#F59E0B',done:false},
   ],
   goals:[
-    {id:'g1',t:'Make the N1 team',            pct:60, done:false,hor:'Yearly', cat:'athletics'},
-    {id:'g2',t:'Improve first touch',          pct:20, done:false,hor:'Monthly',cat:'athletics'},
-    {id:'g3',t:'Attend all summer practices',  pct:100,done:true, hor:'Monthly',cat:'athletics'},
-    {id:'g4',t:'Read through the book of John',pct:50, done:false,hor:'Monthly',cat:'faith'},
-    {id:'g5',t:'Memorize a verse a week',       pct:100,done:true, hor:'Weekly', cat:'faith'},
-    {id:'g6',t:'Pray before every meal this week',pct:40,done:false,hor:'Weekly', cat:'faith'},
-    {id:'g7',t:'Bring my grade up in math',     pct:0,  done:false,hor:'Monthly',cat:'academics'},
-    {id:'g8',t:'Read 20 pages a week',          pct:66, done:false,hor:'Weekly', cat:'academics'},
-    {id:'g9',t:'Turn in every assignment on time this month',pct:100,done:true,hor:'Monthly',cat:'academics'},
-    {id:'g10',t:'Learn a new song for the fall concert',pct:75,done:false,hor:'Monthly',cat:'creative'},
-    {id:'g11',t:'Practice my part every day this week',pct:30,done:false,hor:'Weekly', cat:'creative'},
-    {id:'g12',t:'Try out for first chair',      pct:100,done:true, hor:'Yearly', cat:'creative'},
+    // Faith — full chain, completed, to demonstrate what a finished cascade looks like
+    {id:'g1',t:'Read through the whole Bible this year',pct:0,done:false,hor:'Yearly', cat:'faith',parentId:null},
+    {id:'g2',t:'Read through the book of John',         pct:0,done:false,hor:'Monthly',cat:'faith',parentId:'g1'},
+    {id:'g3',t:'Read your Bible before you pick up your phone',pct:100,done:true,hor:'Weekly',cat:'faith',parentId:'g2'},
+    // Academics — in progress
+    {id:'g4',t:'Set a grade target worth working for', pct:0,done:false,hor:'Yearly', cat:'academics',parentId:null},
+    {id:'g5',t:'Tackle the assignment you have been avoiding',pct:0,done:false,hor:'Monthly',cat:'academics',parentId:'g4'},
+    {id:'g6',t:'Start homework before dinner every day this week',pct:60,done:false,hor:'Weekly',cat:'academics',parentId:'g5'},
+    // Athletics — in progress
+    {id:'g7',t:'Make the N1 team',                     pct:0,done:false,hor:'Yearly', cat:'athletics',parentId:null},
+    {id:'g8',t:'Improve first touch',                  pct:0,done:false,hor:'Monthly',cat:'athletics',parentId:'g7'},
+    {id:'g9',t:'Get extra reps outside of practice this week',pct:40,done:false,hor:'Weekly',cat:'athletics',parentId:'g8'},
+    // Creative — in progress
+    {id:'g10',t:'Earn first chair by the end of the year',pct:0,done:false,hor:'Yearly', cat:'creative',parentId:null},
+    {id:'g11',t:'Learn a new song for the fall concert',pct:0,done:false,hor:'Monthly',cat:'creative',parentId:'g10'},
+    {id:'g12',t:'Practice my part every day this week', pct:30,done:false,hor:'Weekly',cat:'creative',parentId:'g11'},
   ],
 };
 
@@ -942,6 +947,21 @@ function sHome(){
   '</div>';
 }
 
+function goalChildren(id){
+  return S.goals.filter(function(g){return g.parentId===id;});
+}
+function goalProgress(g){
+  var kids=goalChildren(g.id);
+  if(!kids.length) return g.pct;
+  var sum=kids.reduce(function(acc,k){return acc+goalProgress(k);},0);
+  return Math.round(sum/kids.length);
+}
+function goalIsDone(g){
+  var kids=goalChildren(g.id);
+  if(!kids.length) return g.done;
+  return kids.every(function(k){return goalIsDone(k);});
+}
+
 var CATS={
   faith:    {l:'Faith',    ico:'✝️', clr:'#C5A572', glow:'rgba(197,165,114,0.28)', brd:'rgba(197,165,114,0.35)'},
   academics:{l:'Academics',ico:'📚', clr:'#4A90D9',  glow:'rgba(74,144,217,0.28)',  brd:'rgba(74,144,217,0.35)'},
@@ -973,11 +993,13 @@ var EXAMPLES_BY_CAT={
 };
 
 function sGoals(){
+  var todayList=todaysChecklist();
+  var todayDone=todayList.filter(function(h){return h.done;}).length;
   var catKeys=['faith','academics','athletics','creative'];
   var cats=catKeys.map(function(key){
     var c=CATS[key];
     var catGoals=S.goals.filter(function(g){return g.cat===key;});
-    var done=catGoals.filter(function(g){return g.done;}).length;
+    var done=catGoals.filter(function(g){return goalIsDone(g);}).length;
     var pct=catGoals.length?Math.round(done/catGoals.length*100):0;
     var sub=key==='athletics'?'⚽ Soccer active':done+' of '+catGoals.length+' complete';
     return {key:key,l:c.l,ico:c.ico,clr:c.clr,glow:c.glow,brd:c.brd,sub:sub,pct:pct};
@@ -994,35 +1016,41 @@ function sGoals(){
     '</div>';
   }).join('');
 
-  function tcard(ico,title,clr,pct,badge,val){
-    var bar=typeof pct==='number'
-      ? '<div class="tc-bar"><div class="tc-fill" style="width:'+pct+'%;background:'+clr+'"></div></div>' : '';
-    var bdg=badge?'<span class="freq-badge">🔁 '+badge+'</span>':'';
-    return '<div class="t-card" style="--tc:'+clr+';border-left-color:'+clr+'">'+
-      '<div class="tc-top"><span class="tc-icon">'+ico+'</span>'+
-        '<div style="flex:1"><div class="tc-title">'+title+bdg+'</div>'+
-        '<div class="tc-val">'+val+'</div>'+bar+'</div></div></div>';
+  function tcard(g){
+    var c=CATS[g.cat];
+    var pct=goalProgress(g);
+    var done=goalIsDone(g);
+    var kids=goalChildren(g.id);
+    var parent=g.parentId?S.goals.find(function(x){return x.id===g.parentId;}):null;
+    var sub='';
+    if(parent) sub='<div class="tc-sub">↳ part of: '+esc(parent.t)+'</div>';
+    else if(kids.length) sub='<div class="tc-sub">🔗 rolls up from '+kids.length+' linked goal'+(kids.length>1?'s':'')+'</div>';
+    var bar=done?'':'<div class="tc-bar"><div class="tc-fill" style="width:'+pct+'%;background:'+c.clr+'"></div></div>';
+    return '<div class="t-card" style="--tc:'+c.clr+';border-left-color:'+c.clr+'" data-editg="'+g.id+'">'+
+      '<div class="tc-top"><span class="tc-icon">'+c.ico+'</span>'+
+        '<div style="flex:1"><div class="tc-title">'+esc(g.t)+'</div>'+
+        '<div class="tc-val">'+(done?'Completed ✓':pct+'% complete')+'</div>'+bar+sub+'</div></div></div>';
   }
+
+  var yearlyGoals=S.goals.filter(function(g){return g.hor==='Yearly';});
+  var monthlyGoals=S.goals.filter(function(g){return g.hor==='Monthly';});
+  var weeklyGoals=S.goals.filter(function(g){return g.hor==='Weekly';});
 
   var timeV=
     '<div class="t-sec">'+
       '<div class="t-hd"><div class="t-lbl" style="color:#C5A572">🏔 Yearly</div>'+
-        '<div class="t-line" style="background:#C5A572"></div><div class="t-cnt">3 goals</div></div>'+
-      tcard('⚽','Earn your spot at the next competitive level','#C41E3A',60,null,'60% complete')+
-      tcard('✝️','Make your confirmation year count','#C5A572',null,null,'On track')+
-      tcard('📚','Set a grade target worth working for','#4A90D9',50,null,'50% complete')+
+        '<div class="t-line" style="background:#C5A572"></div><div class="t-cnt">'+yearlyGoals.length+' goal'+(yearlyGoals.length===1?'':'s')+'</div></div>'+
+      yearlyGoals.map(tcard).join('')+
     '</div>'+
     '<div class="t-sec">'+
       '<div class="t-hd"><div class="t-lbl" style="color:#4A90D9">📅 This Month</div>'+
-        '<div class="t-line" style="background:#4A90D9"></div><div class="t-cnt">2 goals</div></div>'+
-      tcard('⚽','Improve your weakest skill this month','#C41E3A',null,'3×/wk','2/3 this week')+
-      tcard('📚','Tackle the assignment you have been avoiding','#4A90D9',null,null,'Due Aug 1')+
+        '<div class="t-line" style="background:#4A90D9"></div><div class="t-cnt">'+monthlyGoals.length+' goal'+(monthlyGoals.length===1?'':'s')+'</div></div>'+
+      monthlyGoals.map(tcard).join('')+
     '</div>'+
     '<div class="t-sec">'+
       '<div class="t-hd"><div class="t-lbl" style="color:#9B72CF">📆 This Week</div>'+
-        '<div class="t-line" style="background:#9B72CF"></div><div class="t-cnt">2 goals</div></div>'+
-      tcard('⚽','Get extra reps outside of practice','#C41E3A',40,null,'2/5 days')+
-      tcard('🎵','Be the most prepared player in rehearsal','#9B72CF',30,null,'In progress')+
+        '<div class="t-line" style="background:#9B72CF"></div><div class="t-cnt">'+weeklyGoals.length+' goal'+(weeklyGoals.length===1?'':'s')+'</div></div>'+
+      weeklyGoals.map(tcard).join('')+
     '</div>';
 
   return '<div class="page-hd"><div><div class="page-title">Goals</div></div>'+logo(36)+'</div>'+
@@ -1036,8 +1064,8 @@ function sGoals(){
           '<div class="hab-strip" style="margin-bottom:0" data-tab="habits">'+
             '<div class="hab-top"><div class="hab-icon">⚡</div>'+
               '<div class="hab-info"><div class="hab-lbl">Daily Habits</div>'+
-              '<div class="hab-sub">2 of 6 done today</div></div>'+
-              '<div class="hab-pct">33%</div>'+
+              '<div class="hab-sub">'+todayDone+' of '+todayList.length+' done today</div></div>'+
+              '<div class="hab-pct">'+(todayList.length?Math.round(todayDone/todayList.length*100):0)+'%</div>'+
             '</div>'+
           '</div>'
         : timeV
@@ -1049,17 +1077,43 @@ function sCatDetail(){
   var key=S.curCat||'athletics';
   var c=CATS[key];
   var goals=S.goals.filter(function(g){return g.cat===key;});
-  var done=goals.filter(function(g){return g.done;}).length;
-  var glist=goals.map(function(g,i){
-    return '<div class="g-card" data-editg="'+g.id+'">'+
-      '<div class="g-dot'+(g.done?' done':'')+'"></div>'+
-      '<div style="flex:1"><div class="g-title'+(g.done?' done':'')+'">'+esc(g.t)+'</div>'+
-        (g.done?'<div class="g-meta">Completed ✓</div>':
-          '<div class="g-hor">'+g.hor+'</div>'+
-          '<div class="g-pbar"><div class="g-pfill" style="width:'+g.pct+'%"></div></div>'+
-          '<div class="g-meta" style="margin-top:4px">'+g.pct+'% complete</div>')+
+  var done=goals.filter(function(g){return goalIsDone(g);}).length;
+
+  function gcard(g,depth){
+    var pct=goalProgress(g);
+    var isDone=goalIsDone(g);
+    var kids=goalChildren(g.id);
+    return '<div class="g-card" data-editg="'+g.id+'" style="'+(depth?'margin-left:'+(depth*18)+'px;border-left:2px solid '+c.clr+'44':'')+'">'+
+      '<div class="g-dot'+(isDone?' done':'')+'"></div>'+
+      '<div style="flex:1"><div class="g-title'+(isDone?' done':'')+'">'+esc(g.t)+'</div>'+
+        (isDone?'<div class="g-meta">Completed ✓</div>':
+          '<div class="g-hor">'+g.hor+(kids.length?' · rolls up from '+kids.length+' linked goal'+(kids.length>1?'s':''):'')+'</div>'+
+          '<div class="g-pbar"><div class="g-pfill" style="width:'+pct+'%"></div></div>'+
+          '<div class="g-meta" style="margin-top:4px">'+pct+'% complete</div>')+
       '</div><span class="g-chev">›</span></div>';
-  }).join('');
+  }
+
+  var yearly=goals.filter(function(g){return g.hor==='Yearly';});
+  var linkedIds={};
+  var tree='';
+  yearly.forEach(function(y){
+    tree+=gcard(y,0);
+    linkedIds[y.id]=true;
+    var months=goalChildren(y.id).filter(function(g){return g.cat===key;});
+    months.forEach(function(m){
+      tree+=gcard(m,1);
+      linkedIds[m.id]=true;
+      var weeks=goalChildren(m.id).filter(function(g){return g.cat===key;});
+      weeks.forEach(function(w){
+        tree+=gcard(w,2);
+        linkedIds[w.id]=true;
+      });
+    });
+  });
+  var orphans=goals.filter(function(g){return !linkedIds[g.id];});
+  var glist=tree+(orphans.length?
+    '<div class="sec" style="margin-top:14px;font-size:11px">Not yet linked to a bigger goal</div>'+orphans.map(function(g){return gcard(g,0);}).join('')
+    :'');
 
   var subLine={
     athletics:'Performance, skills, and training goals',
@@ -1167,7 +1221,7 @@ function sStats(){
   var nums=[
     {n:S.xp,l:'Total XP<br>this season',c:'#C5A572'},
     {n:12,l:'Perfect days<br>all habits done',c:'#30D158'},
-    {n:S.goals.filter(function(g){return g.done;}).length,l:'Goals<br>completed',c:'#C41E3A'},
+    {n:S.goals.filter(function(g){return goalIsDone(g);}).length,l:'Goals<br>completed',c:'#C41E3A'},
     {n:246,l:'Total habits<br>checked off',c:'#F59E0B'}
   ];
   var numsHtml=nums.map(function(x){
@@ -1287,6 +1341,22 @@ function sAddGoal(){
   }).join('');
   var ready=!!(S.picked||(S.addedTitle&&S.addedTitle.trim().length>2));
 
+  var linkSection='';
+  if(S.hor==='monthly'||S.hor==='weekly'){
+    var parentTier=S.hor==='monthly'?'Yearly':'Monthly';
+    var candidates=S.goals.filter(function(g){return g.hor===parentTier&&g.cat===S.curCat;});
+    if(candidates.length){
+      var chips='<div class="sport-chip'+(!S.linkParent?' on':'')+'" data-linkparent="none" style="border-color:'+c.clr+'66;'+(!S.linkParent?'background:'+c.clr+';color:#16141E':'color:'+c.clr)+'">No link</div>'+
+        candidates.map(function(g){
+          var on=S.linkParent===g.id;
+          return '<div class="sport-chip'+(on?' on':'')+'" data-linkparent="'+g.id+'" style="border-color:'+c.clr+'66;'+(on?'background:'+c.clr+';color:#16141E':'color:'+c.clr)+'">'+esc(g.t)+'</div>';
+        }).join('');
+      linkSection='<div class="form-lbl">Link to a '+parentTier+' goal (optional)</div>'+
+        '<div class="ex-note">Its progress will roll up automatically as this one moves.</div>'+
+        '<div class="sport-grid" style="margin-bottom:16px">'+chips+'</div>';
+    }
+  }
+
   return '<div style="display:flex;flex-direction:column;height:100%">'+
     '<div class="topbar"><button class="back" data-go="catdetail">‹ '+c.l+'</button><span class="tbar-title">Add Goal</span>'+logo(32)+'</div>'+
     '<div class="scroll fin">'+
@@ -1301,6 +1371,7 @@ function sAddGoal(){
           '<button class="freq-adj" id="fup">+</button></div>'+
         '<div class="freq-note">🔁 A daily task will appear in your checklist and track <strong>'+S.freqN+'×/week</strong> — auto-resets Monday and earns +75 XP when hit.</div>':'')+
       '<div class="form-lbl">Time Horizon</div><div class="hor-row">'+hbtns+'</div>'+
+      linkSection+
       '<div class="ex-hd">Suggestions — make it yours</div>'+
       '<div class="ex-note">These are starting points, not answers. Tap one and make it your own.</div>'+exs+
       '<div class="form-lbl" style="margin-top:16px">Or write your own</div>'+
@@ -1317,9 +1388,10 @@ function sParentDash(){
     var cg=S.goals.filter(function(g){return g.cat===key;});
     if(!cg.length) return '';
     var glist=cg.map(function(g){
-      return '<div class="p-row'+(g.done?' done':'')+'"><span>'+(g.done?'✅':'⬜')+'</span>'+
-        '<span style="flex:1;'+(g.done?'text-decoration:line-through':'')+'">'+esc(g.t)+'</span>'+
-        (g.pct&&!g.done?'<span style="font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:800;color:'+c.clr+'">'+g.pct+'%</span>':'')+
+      var gd=goalIsDone(g);var gp=goalProgress(g);
+      return '<div class="p-row'+(gd?' done':'')+'"><span>'+(gd?'✅':'⬜')+'</span>'+
+        '<span style="flex:1;'+(gd?'text-decoration:line-through':'')+'">'+esc(g.t)+'</span>'+
+        (gp&&!gd?'<span style="font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:800;color:'+c.clr+'">'+gp+'%</span>':'')+
       '</div>';
     }).join('');
     return '<div class="p-sec"><div class="p-hd" style="color:'+c.clr+'">'+c.ico+' '+c.l+' Goals</div>'+
@@ -1505,45 +1577,84 @@ function showEditGoal(id){
   var g=S.goals.find(function(x){return x.id===id;});
   if(!g) return;
   var c=CATS[g.cat]||CATS.athletics;
+  var kids=goalChildren(g.id);
+  var hasKids=kids.length>0;
+  var relinkTo=g.parentId||null;
+  var parentTier=g.hor==='Monthly'?'Yearly':g.hor==='Weekly'?'Monthly':null;
+  var candidates=parentTier?S.goals.filter(function(x){return x.hor===parentTier&&x.cat===g.cat&&x.id!==g.id;}):[];
+
   var ov=document.createElement('div');
   ov.className='pin-overlay';
   document.body.appendChild(ov);
 
   function draw(){
+    var rolledPct=goalProgress(g);
+    var rolledDone=goalIsDone(g);
+
+    var progressBlock=hasKids?
+      ('<div style="margin-bottom:14px">'+
+        '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px">'+
+          '<span>Progress (auto)</span><span>'+rolledPct+'%</span></div>'+
+        '<div class="g-pbar"><div class="g-pfill" style="width:'+rolledPct+'%"></div></div>'+
+        '<div style="font-size:11px;color:var(--muted);margin-top:6px">Rolls up automatically from '+kids.length+' linked goal'+(kids.length>1?'s':'')+' — '+(rolledDone?'all complete ✓':'not yet complete')+'</div>'+
+      '</div>')
+      :('<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'+
+          '<label style="font-size:13px;color:var(--text);flex:1;display:flex;align-items:center;gap:8px;cursor:pointer">'+
+            '<input type="checkbox" id="eg-done" '+(g.done?'checked':'')+' style="width:20px;height:20px"> Mark as completed'+
+          '</label>'+
+        '</div>'+
+        '<div id="eg-pct-wrap" style="'+(g.done?'opacity:.4;pointer-events:none':'')+'">'+
+          '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px">'+
+            '<span>Progress</span><span id="eg-pct-lbl">'+g.pct+'%</span></div>'+
+          '<input type="range" id="eg-pct" min="0" max="100" value="'+g.pct+'" style="width:100%;margin-bottom:16px">'+
+        '</div>');
+
+    var linkBlock='';
+    if(parentTier && candidates.length){
+      var chips='<div class="sport-chip'+(!relinkTo?' on':'')+'" data-relink="none" style="border-color:'+c.clr+'66;'+(!relinkTo?'background:'+c.clr+';color:#16141E':'color:'+c.clr)+'">No link</div>'+
+        candidates.map(function(x){
+          var on=relinkTo===x.id;
+          return '<div class="sport-chip'+(on?' on':'')+'" data-relink="'+x.id+'" style="border-color:'+c.clr+'66;'+(on?'background:'+c.clr+';color:#16141E':'color:'+c.clr)+'">'+esc(x.t)+'</div>';
+        }).join('');
+      linkBlock='<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Linked to ('+parentTier+')</div>'+
+        '<div class="sport-grid" style="margin-bottom:16px" id="eg-relink">'+chips+'</div>';
+    }
+
     ov.innerHTML='<div class="pin-modal" style="text-align:left;max-width:340px">'+
       '<button class="pin-x" id="egx">✕</button>'+
       '<div style="font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:'+c.clr+';margin-bottom:6px">'+c.ico+' '+c.l+'</div>'+
       '<input id="eg-title" class="f-area" style="min-height:auto;height:44px;margin-bottom:14px" value="'+esc(g.t)+'">'+
-      (g.hor==='Yearly'||g.hor==='Monthly'||g.hor==='Weekly'?
-        '<div style="font-size:11px;color:var(--muted);margin-bottom:14px">'+g.hor+' goal</div>':'')+
-      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'+
-        '<label style="font-size:13px;color:var(--text);flex:1;display:flex;align-items:center;gap:8px;cursor:pointer">'+
-          '<input type="checkbox" id="eg-done" '+(g.done?'checked':'')+' style="width:20px;height:20px"> Mark as completed'+
-        '</label>'+
-      '</div>'+
-      '<div id="eg-pct-wrap" style="'+(g.done?'opacity:.4;pointer-events:none':'')+'">'+
-        '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px">'+
-          '<span>Progress</span><span id="eg-pct-lbl">'+g.pct+'%</span></div>'+
-        '<input type="range" id="eg-pct" min="0" max="100" value="'+g.pct+'" style="width:100%;margin-bottom:16px">'+
-      '</div>'+
+      '<div style="font-size:11px;color:var(--muted);margin-bottom:14px">'+g.hor+' goal</div>'+
+      progressBlock+
+      linkBlock+
       '<button class="btn btn-red" id="eg-save" style="margin-bottom:8px">Save Changes</button>'+
       '<button class="btn btn-ghost" id="eg-delete">🗑 Delete Goal</button>'+
     '</div>';
 
     document.getElementById('egx').onclick=function(){ov.remove();};
-    var doneChk=document.getElementById('eg-done');
-    var pctWrap=document.getElementById('eg-pct-wrap');
-    var pctInput=document.getElementById('eg-pct');
-    var pctLbl=document.getElementById('eg-pct-lbl');
-    doneChk.onchange=function(){pctWrap.style.opacity=doneChk.checked?'.4':'1';pctWrap.style.pointerEvents=doneChk.checked?'none':'auto';};
-    pctInput.oninput=function(){pctLbl.textContent=pctInput.value+'%';};
+    if(!hasKids){
+      var doneChk=document.getElementById('eg-done');
+      var pctWrap=document.getElementById('eg-pct-wrap');
+      var pctInput=document.getElementById('eg-pct');
+      var pctLbl=document.getElementById('eg-pct-lbl');
+      doneChk.onchange=function(){pctWrap.style.opacity=doneChk.checked?'.4':'1';pctWrap.style.pointerEvents=doneChk.checked?'none':'auto';};
+      pctInput.oninput=function(){pctLbl.textContent=pctInput.value+'%';};
+    }
+    ov.querySelectorAll('[data-relink]').forEach(function(chip){
+      chip.onclick=function(){relinkTo=chip.dataset.relink==='none'?null:chip.dataset.relink;draw();};
+    });
 
     document.getElementById('eg-save').onclick=function(){
       var title=document.getElementById('eg-title').value.trim();
       if(!title) return;
       g.t=title;
-      g.done=doneChk.checked;
-      g.pct=doneChk.checked?100:parseInt(pctInput.value,10);
+      if(!hasKids){
+        var dc=document.getElementById('eg-done');
+        var pi=document.getElementById('eg-pct');
+        g.done=dc.checked;
+        g.pct=dc.checked?100:parseInt(pi.value,10);
+      }
+      if(parentTier) g.parentId=relinkTo;
       fbSaveState();
       toast('Goal updated ✓','#30D158');
       ov.remove();
@@ -1691,7 +1802,8 @@ function showProfile(){
       '<p><strong>Goals are where you\'re going.</strong> Outcomes you work toward over weeks, months, or a whole year.</p>'+
       '<p><strong>Habits are how you get there.</strong> The daily actions that close the gap.</p>'+
       '<p><em>You can\'t control whether you make the team. You can control whether you practice.</em></p>'+
-      '<p><strong>Repeating goals</strong> — like "practice 3x per week" — are goals that become habits.</p>'],
+      '<p><strong>Repeating goals</strong> — like "practice 3x per week" — are goals that become habits.</p>'+
+      '<p><strong>How the three time frames connect:</strong> a Weekly goal can link up to a Monthly goal, and a Monthly goal can link up to a Yearly one. When they\'re linked, the bigger goal\'s progress bar moves automatically as the smaller one does — you never have to update it by hand. Finish this week\'s goal, and the month moves. Finish the month, and the year moves.</p>'],
     ['s5','📊','Your Stats Explained','<div>'+statExp+'</div>'],
     ['s6','💪','Why Habits Compound',
       '<p>Making your bed doesn\'t make you better at your sport. Not directly. But <em>it makes you someone who does what they said they\'d do.</em></p>'+
@@ -1797,10 +1909,11 @@ function bind(){
   var tb=document.getElementById('theme-btn');if(tb) tb.onclick=toggleTheme;
 
   app.querySelectorAll('[data-tab]').forEach(function(el){el.onclick=function(){S.tab=el.dataset.tab;go('main');};});
-  app.querySelectorAll('[data-go]').forEach(function(el){el.onclick=function(){if(el.dataset.cat) S.curCat=el.dataset.cat;go(el.dataset.go);};});
+  app.querySelectorAll('[data-go]').forEach(function(el){el.onclick=function(){if(el.dataset.cat) S.curCat=el.dataset.cat;if(el.dataset.go==='addg'){S.linkParent=null;S.picked=null;S.addedTitle='';}go(el.dataset.go);};});
   app.querySelectorAll('[data-gtab]').forEach(function(el){el.onclick=function(){S.goalsTab=el.dataset.gtab;render();};});
   app.querySelectorAll('[data-gtype]').forEach(function(el){el.onclick=function(){S.goalType=el.dataset.gtype;render();};});
-  app.querySelectorAll('[data-hor]').forEach(function(el){el.onclick=function(){S.hor=el.dataset.hor;S.picked=null;render();};});
+  app.querySelectorAll('[data-hor]').forEach(function(el){el.onclick=function(){S.hor=el.dataset.hor;S.picked=null;S.linkParent=null;render();};});
+  app.querySelectorAll('[data-linkparent]').forEach(function(el){el.onclick=function(){S.linkParent=el.dataset.linkparent==='none'?null:el.dataset.linkparent;render();};});
   app.querySelectorAll('[data-pick]').forEach(function(el){
     el.onclick=function(){S.picked=el.dataset.pick;S.addedTitle=el.dataset.etxt||'';render();};
   });
@@ -1856,7 +1969,7 @@ function bind(){
   if(sg) sg.onclick=function(){
     var t=S.addedTitle||(cg?cg.value:'');
     if(!t.trim()) return;
-    S.goals.push({id:'g'+Date.now(),t:t.trim(),pct:0,done:false,hor:cap(S.hor),cat:S.curCat});
+    S.goals.push({id:'g'+Date.now(),t:t.trim(),pct:0,done:false,hor:cap(S.hor),cat:S.curCat,parentId:S.linkParent||null});
     toast('Goal added! 💪','#C41E3A');
     S.picked=null;S.addedTitle='';
     go('catdetail');
