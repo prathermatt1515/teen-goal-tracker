@@ -243,16 +243,16 @@ html[data-theme="light"] .verse-screen{background:#16141E !important;} /* verse 
 .g-title.done{color:var(--muted);text-decoration:line-through;}
 .g-meta{font-size:11px;color:var(--muted);margin-top:3px;}
 .g-hor{display:inline-block;padding:3px 9px;border-radius:8px;
-  background:rgba(196,30,58,.12);border:1px solid rgba(196,30,58,.25);
-  color:var(--red);font-size:9px;font-weight:800;font-family:'Barlow Condensed',sans-serif;
+  background:rgba(52,168,110,.14);border:1px solid rgba(52,168,110,.3);
+  color:#5FBF8F;font-size:9px;font-weight:800;font-family:'Barlow Condensed',sans-serif;
   letter-spacing:.06em;text-transform:uppercase;margin-top:6px;}
 .g-pbar{height:4px;background:rgba(var(--overlay-rgb),.08);border-radius:4px;overflow:hidden;margin-top:10px;}
 .g-pfill{height:100%;background:var(--red);border-radius:4px;}
 .g-chev{color:var(--muted);font-size:20px;align-self:center;}
 .add-btn{padding:14px;border-radius:var(--r);text-align:center;
   font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;
-  color:var(--red);letter-spacing:.06em;cursor:pointer;margin-top:4px;
-  background:rgba(196,30,58,.1);border:1.5px solid rgba(196,30,58,.25);
+  color:#5FBF8F;letter-spacing:.06em;cursor:pointer;margin-top:4px;
+  background:rgba(52,168,110,.12);border:1.5px solid rgba(52,168,110,.3);
   -webkit-tap-highlight-color:transparent;transition:transform .1s;}
 .add-btn:active{transform:scale(.98);}
 
@@ -1053,7 +1053,7 @@ function sGoals(){
       weeklyGoals.map(tcard).join('')+
     '</div>';
 
-  return '<div class="page-hd"><div><div class="page-title">Goals</div></div>'+logo(36)+'</div>'+
+  return '<div class="page-hd"><div><div class="page-title">Goals</div></div><div id="avatar-btn" style="cursor:pointer">'+logo(36)+'</div></div>'+
     '<div class="scroll fin">'+
       '<div class="g-toggle">'+
         '<div class="gt'+(S.goalsTab==='cat'?' on':'')+'" data-gtab="cat">Categories</div>'+
@@ -1130,7 +1130,7 @@ function sCatDetail(){
 
   return '<div style="display:flex;flex-direction:column;height:100%">'+
     '<div class="topbar"><button class="back" data-tab="goals">‹ Goals</button>'+
-      '<span class="tbar-title" style="color:'+c.clr+'">'+c.ico+' '+c.l+'</span>'+logo(32)+'</div>'+
+      '<span class="tbar-title" style="color:'+c.clr+'">'+c.ico+' '+c.l+'</span><div id="avatar-btn" style="cursor:pointer">'+logo(32)+'</div></div>'+
     '<div class="scroll fin">'+
       '<div class="hero-sec">'+
         '<div class="hero-sub">'+subLine+'</div>'+
@@ -1141,7 +1141,7 @@ function sCatDetail(){
         '</div>'+
       '</div>'+
       sportTabs+glist+
-      '<div class="add-btn" data-go="addg" style="border-color:'+c.clr+'">+ Add '+c.l+' Goal</div>'+
+      '<div class="add-btn" data-go="addg">+ Add '+c.l+' Goal</div>'+
     '</div>'+nav()+'</div>';
 }
 
@@ -1172,7 +1172,7 @@ function sHabits(){
   return '<div class="page-hd">'+
     '<div><div class="page-title" style="color:#F59E0B">⚡ Habits</div>'+
       '<div class="badge badge-fire" style="margin-top:8px;display:inline-flex">🔥 '+S.streak+'-day streak</div></div>'+
-    logo(36)+'</div>'+
+    '<div id="avatar-btn" style="cursor:pointer">'+logo(36)+'</div></div>'+
     '<div class="scroll fin">'+
       '<div class="hero-sec">'+
         '<div class="hero-sub">The daily things that build a great life</div>'+
@@ -1289,7 +1289,7 @@ function sStats(){
     '</div>';
   }).join('');
 
-  return '<div class="page-hd"><div><div class="page-title">Stats</div><div class="page-sub">Season 1 · Aug–Dec 2025</div></div>'+logo(36)+'</div>'+
+  return '<div class="page-hd"><div><div class="page-title">Stats</div><div class="page-sub">Season 1 · Aug–Dec 2025</div></div><div id="avatar-btn" style="cursor:pointer">'+logo(36)+'</div></div>'+
     '<div class="scroll fin">'+
       '<div class="nums-grid">'+numsHtml+'</div>'+
       '<div class="sec">Activity Calendar</div>'+
@@ -1358,7 +1358,7 @@ function sAddGoal(){
   }
 
   return '<div style="display:flex;flex-direction:column;height:100%">'+
-    '<div class="topbar"><button class="back" data-go="catdetail">‹ '+c.l+'</button><span class="tbar-title">Add Goal</span>'+logo(32)+'</div>'+
+    '<div class="topbar"><button class="back" data-go="catdetail">‹ '+c.l+'</button><span class="tbar-title">Add Goal</span><div id="avatar-btn" style="cursor:pointer">'+logo(32)+'</div></div>'+
     '<div class="scroll fin">'+
       '<div class="form-lbl">Goal Type</div>'+
       '<div class="gtype-row">'+
@@ -1402,7 +1402,7 @@ function sParentDash(){
   }).join('');
 
   return '<div style="display:flex;flex-direction:column;height:100%">'+
-    '<div class="topbar">'+logo(32)+'<span class="tbar-title" style="flex:1;text-align:center">Parent View</span>'+
+    '<div class="topbar"><div id="avatar-btn" style="cursor:pointer">'+logo(32)+'</div><span class="tbar-title" style="flex:1;text-align:center">Parent View</span>'+
       '<button id="lock-close" style="background:var(--card2);border:none;border-radius:10px;padding:6px 12px;font-size:12px;color:var(--sub);font-family:inherit;cursor:pointer;font-weight:600">Lock 🔒</button></div>'+
     '<div class="scroll fin">'+
       '<div class="p-pills">'+
