@@ -1,0 +1,1531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Nolan's Goal Tracker</title>
+<meta name="theme-color" content="#16141E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Nolan's Tracker">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Firebase (compat SDKs — simplest to wire up on top of a vanilla-JS app like this one) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:'Inter',-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;overflow:hidden;}
+
+/* ── Game palette — same colors, warmer dark ── */
+:root{
+  --bg:#16141E;
+  --card:#221F2E;
+  --card2:#2C2840;
+  --glass:rgba(255,255,255,0.06);
+  --border:rgba(255,255,255,0.1);
+  --glow:rgba(197,165,114,0.15);
+  --text:#F5F5F7;
+  --sub:#9B97B0;
+  --muted:#5E5A72;
+  --gold:#C5A572;
+  --goldbright:#D4B87A;
+  --red:#C41E3A;
+  --blue:#4A90D9;
+  --purple:#9B72CF;
+  --amber:#F59E0B;
+  --green:#30D158;
+  --r:22px;
+  --r-sm:14px;
+}
+body{background:var(--bg);color:var(--text);}
+#app{height:100dvh;height:100vh;overflow:hidden;display:flex;flex-direction:column;
+  background:var(--bg);padding-top:env(safe-area-inset-top,0px);}
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:14px 14px 20px;}
+::-webkit-scrollbar{width:0;}
+
+/* ── Game Bottom Nav ── */
+.bot-nav{display:flex;gap:6px;padding:8px 10px calc(10px + env(safe-area-inset-bottom,0px));
+  background:var(--card);flex-shrink:0;border-top:1px solid var(--border);}
+.ni{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;padding:6px 4px;
+  border-radius:var(--r-sm);transition:background .15s;}
+.ni.on{background:var(--glass);}
+.ni-ico{font-size:20px;line-height:1;}
+.ni-lbl{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
+.ni.on .ni-lbl{color:var(--gold);}
+
+/* ── Topbar ── */
+.topbar{display:flex;align-items:center;gap:10px;padding:10px 14px 8px;
+  border-bottom:1px solid var(--border);flex-shrink:0;}
+.back{background:none;border:none;color:var(--blue);font-size:16px;font-family:inherit;
+  font-weight:600;cursor:pointer;padding:4px 8px 4px 0;-webkit-tap-highlight-color:transparent;}
+.tbar-title{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;
+  color:var(--text);flex:1;letter-spacing:.02em;}
+
+/* ── Game Header (home) ── */
+.game-hdr{display:flex;align-items:center;gap:10px;
+  padding:env(safe-area-inset-top,44px) 14px 12px;flex-shrink:0;}
+.avatar{width:52px;height:52px;border-radius:16px;overflow:hidden;
+  border:2px solid var(--gold);flex-shrink:0;}
+.hdr-info{flex:1;}
+.hdr-name{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;
+  color:var(--text);line-height:1;letter-spacing:.02em;}
+.hdr-date{font-size:11px;color:var(--muted);margin-top:2px;}
+.hdr-badges{display:flex;gap:6px;align-items:center;}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;
+  border-radius:20px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;}
+.badge-fire{background:rgba(245,158,11,.18);border:1px solid rgba(245,158,11,.35);color:var(--amber);}
+.badge-xp{background:rgba(197,165,114,.14);border:1px solid rgba(197,165,114,.3);color:var(--gold);}
+.hdr-theme{background:rgba(255,255,255,.08);border:1px solid var(--border);
+  border-radius:12px;padding:6px 10px;font-size:14px;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;flex-shrink:0;}
+.hdr-lock{background:none;border:none;font-size:16px;cursor:pointer;
+  opacity:.22;padding:4px;-webkit-tap-highlight-color:transparent;flex-shrink:0;}
+
+/* ── XP Level Card ── */
+.xp-card{background:linear-gradient(135deg,rgba(197,165,114,.18) 0%,rgba(30,26,46,.9) 60%);
+  border:1.5px solid rgba(197,165,114,.3);border-radius:var(--r);
+  padding:14px 16px;margin-bottom:14px;}
+.xp-top{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.level-badge{background:linear-gradient(135deg,var(--gold),var(--goldbright));
+  color:#16141E;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;
+  letter-spacing:.06em;text-transform:uppercase;padding:5px 14px;border-radius:20px;
+  white-space:nowrap;}
+.xp-info{flex:1;text-align:right;}
+.xp-nums{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:var(--sub);}
+.xp-next{font-size:10px;color:var(--muted);margin-top:1px;}
+.xp-bar-wrap{position:relative;height:10px;background:rgba(255,255,255,.08);
+  border-radius:20px;overflow:hidden;}
+.xp-bar-fill{height:100%;background:linear-gradient(90deg,#C5A572,#D4B87A,#E8C98A);
+  border-radius:20px;transition:width .5s ease;
+  box-shadow:0 0 8px rgba(197,165,114,.5);}
+
+/* ── Verse card (game "daily message" style) ── */
+.verse-card{background:linear-gradient(135deg,rgba(74,144,217,.18) 0%,rgba(30,26,46,.9) 70%);
+  border:1.5px solid rgba(74,144,217,.28);border-radius:var(--r);
+  padding:14px 16px;margin-bottom:14px;display:flex;align-items:flex-start;gap:10px;}
+.verse-cross{font-size:26px;flex-shrink:0;margin-top:2px;}
+.verse-body{flex:1;}
+.verse-label{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--blue);margin-bottom:4px;}
+.verse-txt{font-size:13px;color:var(--text);line-height:1.5;font-style:italic;}
+.verse-ref{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;
+  color:var(--gold);margin-top:4px;}
+
+/* ── Section label ── */
+.sec{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+
+/* ── Game category cards ── */
+.cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.cat-card{border-radius:var(--r);padding:16px 14px 18px;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;transition:transform .1s;position:relative;
+  overflow:hidden;border:1.5px solid var(--ac-border);}
+.cat-card:active{transform:scale(.97);}
+.cat-card::before{content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,var(--ac-glow) 0%,rgba(22,20,30,.95) 65%);
+  pointer-events:none;}
+.cat-card-inner{position:relative;z-index:1;}
+.cat-icon{font-size:32px;display:block;margin-bottom:8px;}
+.cat-lbl{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.04em;color:var(--ac);margin-bottom:3px;}
+.cat-stat{font-size:10px;color:var(--sub);}
+.cat-pbar{margin-top:10px;height:5px;background:rgba(255,255,255,.1);
+  border-radius:10px;overflow:hidden;}
+.cat-pfill{height:100%;background:var(--ac);border-radius:10px;opacity:.85;}
+
+/* ── Habits strip ── */
+.hab-strip{background:linear-gradient(135deg,rgba(245,158,11,.18) 0%,rgba(30,26,46,.9) 65%);
+  border:1.5px solid rgba(245,158,11,.3);border-radius:var(--r);
+  padding:14px 16px;cursor:pointer;-webkit-tap-highlight-color:transparent;
+  transition:transform .1s;margin-bottom:14px;}
+.hab-strip:active{transform:scale(.98);}
+.hab-top{display:flex;align-items:center;gap:10px;}
+.hab-icon{font-size:28px;}
+.hab-info{flex:1;}
+.hab-lbl{font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.04em;color:var(--amber);}
+.hab-sub{font-size:10px;color:var(--sub);margin-top:2px;}
+.hab-pct{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:800;color:var(--amber);}
+.hab-dots{display:flex;gap:4px;margin-top:10px;}
+.hdot{height:6px;border-radius:3px;flex:1;}
+
+/* ── Checklist (game mission style) ── */
+.chk-list{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.chk-row{display:flex;align-items:center;gap:10px;padding:12px 14px;
+  background:var(--card);border:1px solid var(--border);border-radius:16px;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .1s;}
+.chk-row:active{transform:scale(.98);}
+.chk-box{width:24px;height:24px;border-radius:8px;border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  font-size:13px;font-weight:700;color:white;transition:all .15s;}
+.row-lbl{font-size:14px;font-weight:500;color:var(--text);flex:1;}
+.row-lbl.done{color:var(--muted);text-decoration:line-through;}
+.row-cat{font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.06em;}
+
+/* ── Goals toggle ── */
+.g-toggle{display:flex;background:var(--card);border-radius:var(--r);
+  padding:4px;gap:4px;margin-bottom:16px;border:1px solid var(--border);}
+.gt{flex:1;text-align:center;padding:9px 4px;border-radius:var(--r-sm);
+  font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+  cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent;}
+.gt.on{background:linear-gradient(135deg,rgba(197,165,114,.25),rgba(197,165,114,.1));
+  color:var(--gold);border:1px solid rgba(197,165,114,.3);}
+
+/* ── Time view cards ── */
+.t-sec{margin-bottom:22px;}
+.t-hd{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+.t-lbl{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;
+  letter-spacing:.06em;text-transform:uppercase;}
+.t-line{flex:1;height:1px;opacity:.15;}
+.t-cnt{font-size:10px;color:var(--muted);}
+.t-card{background:var(--card);border-radius:18px;border-left:4px solid var(--tc);
+  padding:14px 16px;margin-bottom:8px;border:1.5px solid rgba(255,255,255,.07);
+  border-left:4px solid var(--tc);}
+.tc-top{display:flex;align-items:flex-start;gap:10px;}
+.tc-icon{font-size:18px;flex-shrink:0;margin-top:2px;}
+.tc-title{font-size:14px;font-weight:500;color:var(--text);line-height:1.35;flex:1;}
+.tc-val{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;
+  color:var(--tc);margin-top:5px;}
+.tc-bar{height:4px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;margin-top:8px;}
+.tc-fill{height:100%;border-radius:4px;}
+.freq-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:6px;
+  background:rgba(74,144,217,.15);border:1px solid rgba(74,144,217,.25);color:var(--blue);
+  font-size:9px;font-weight:800;font-family:'Barlow Condensed',sans-serif;
+  letter-spacing:.06em;text-transform:uppercase;margin-left:6px;vertical-align:middle;}
+
+/* ── Sport tabs ── */
+.sport-tabs{display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;}
+.s-tab{padding:7px 16px;border-radius:20px;font-family:'Barlow Condensed',sans-serif;
+  font-size:12px;font-weight:800;letter-spacing:.06em;white-space:nowrap;
+  cursor:pointer;border:1.5px solid;-webkit-tap-highlight-color:transparent;transition:all .15s;}
+.s-tab.on{background:rgba(196,30,58,.18);border-color:rgba(196,30,58,.5);color:var(--red);}
+.s-tab.off{border-color:var(--border);color:var(--muted);}
+
+/* ── Goal cards ── */
+.g-card{background:var(--card);border-radius:var(--r);padding:14px 16px;
+  display:flex;align-items:flex-start;gap:12px;margin-bottom:10px;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;transition:transform .1s;
+  border:1.5px solid var(--border);}
+.g-card:active{transform:scale(.98);}
+.g-dot{width:22px;height:22px;border-radius:50%;border:2px solid var(--red);
+  flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;}
+.g-dot.done{background:var(--red);}
+.g-dot.done::after{content:'✓';font-size:11px;font-weight:700;color:white;}
+.g-title{font-size:14px;font-weight:500;color:var(--text);}
+.g-title.done{color:var(--muted);text-decoration:line-through;}
+.g-meta{font-size:11px;color:var(--muted);margin-top:3px;}
+.g-hor{display:inline-block;padding:3px 9px;border-radius:8px;
+  background:rgba(196,30,58,.12);border:1px solid rgba(196,30,58,.25);
+  color:var(--red);font-size:9px;font-weight:800;font-family:'Barlow Condensed',sans-serif;
+  letter-spacing:.06em;text-transform:uppercase;margin-top:6px;}
+.g-pbar{height:4px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;margin-top:10px;}
+.g-pfill{height:100%;background:var(--red);border-radius:4px;}
+.g-chev{color:var(--muted);font-size:20px;align-self:center;}
+.add-btn{padding:14px;border-radius:var(--r);text-align:center;
+  font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;
+  color:var(--red);letter-spacing:.06em;cursor:pointer;margin-top:4px;
+  background:rgba(196,30,58,.1);border:1.5px solid rgba(196,30,58,.25);
+  -webkit-tap-highlight-color:transparent;transition:transform .1s;}
+.add-btn:active{transform:scale(.98);}
+
+/* ── Habits screen ── */
+.hero-sec{padding:0 0 16px;border-bottom:1px solid var(--border);margin-bottom:16px;}
+.hero-sub{font-size:12px;color:var(--muted);margin-bottom:10px;}
+.hab-manage{display:flex;align-items:center;gap:10px;padding:12px 16px;
+  background:var(--card);border:1.5px solid var(--border);border-radius:16px;
+  margin-bottom:8px;}
+
+/* ── Add Goal ── */
+.gtype-row{display:flex;gap:10px;margin-bottom:20px;}
+.gtype{flex:1;padding:14px 10px;border-radius:var(--r);border:1.5px solid var(--border);
+  background:var(--card);text-align:center;cursor:pointer;-webkit-tap-highlight-color:transparent;
+  transition:all .15s;}
+.gtype.on{border-color:var(--red);background:rgba(196,30,58,.1);}
+.gtype-ico{font-size:26px;display:block;margin-bottom:6px;}
+.gtype-lbl{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
+.gtype.on .gtype-lbl{color:var(--red);}
+.gtype-desc{font-size:10px;color:var(--muted);margin-top:3px;line-height:1.3;}
+.freq-row{display:flex;align-items:center;gap:10px;padding:16px;
+  background:var(--card);border-radius:var(--r);margin-bottom:16px;
+  border:1.5px solid var(--border);}
+.freq-adj{background:var(--card2);border:none;border-radius:12px;
+  width:40px;height:40px;font-size:22px;color:var(--text);cursor:pointer;
+  -webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;}
+.freq-n{font-family:'Barlow Condensed',sans-serif;font-size:36px;font-weight:800;
+  color:var(--blue);flex:1;text-align:center;}
+.freq-note{font-size:12px;color:var(--blue);background:rgba(74,144,217,.08);
+  border:1.5px solid rgba(74,144,217,.2);border-radius:var(--r-sm);
+  padding:10px 14px;line-height:1.55;margin-bottom:16px;}
+.hor-row{display:flex;gap:6px;margin-bottom:16px;}
+.h-btn{flex:1;padding:9px 4px;border-radius:var(--r-sm);border:1.5px solid var(--border);
+  background:var(--card);color:var(--muted);font-family:'Barlow Condensed',sans-serif;
+  font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
+  cursor:pointer;text-align:center;transition:all .15s;-webkit-tap-highlight-color:transparent;}
+.h-btn.on{border-color:var(--red);background:rgba(196,30,58,.1);color:var(--red);}
+.ex-hd{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.ex-note{font-size:11px;color:var(--sub);background:var(--card);border-radius:var(--r-sm);
+  padding:10px 14px;margin-bottom:10px;line-height:1.5;border:1px solid var(--border);}
+.ex-item{background:var(--card);border:1.5px solid var(--border);border-radius:16px;
+  padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:10px;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .15s;}
+.ex-item:active{transform:scale(.98);}
+.ex-item.on{border-color:var(--red);background:rgba(196,30,58,.08);}
+.ex-txt{font-size:14px;color:var(--text);flex:1;}
+.ex-add{width:26px;height:26px;border-radius:50%;border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  font-size:13px;color:var(--muted);}
+.ex-item.on .ex-add{background:var(--red);border-color:var(--red);color:white;}
+.ex-item.on .ex-add::after{content:'✓';}
+.form-lbl{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.f-area{width:100%;background:var(--card);border:1.5px solid var(--border);
+  border-radius:var(--r-sm);color:var(--text);font-family:inherit;font-size:14px;
+  padding:14px;outline:none;resize:none;min-height:80px;transition:border-color .15s;}
+.f-area:focus{border-color:rgba(197,165,114,.4);}
+
+/* ── Stats ── */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+.stat-box{background:var(--card);border-radius:var(--r);padding:16px 14px;
+  border:1.5px solid var(--border);}
+.stat-big{font-family:'Barlow Condensed',sans-serif;font-size:46px;
+  font-weight:800;color:var(--gold);line-height:1;}
+.stat-lbl{font-size:11px;color:var(--muted);margin-top:3px;}
+.week-grid{display:flex;gap:5px;}
+.wk-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;}
+.wk-d{font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:800;
+  text-transform:uppercase;color:var(--muted);}
+.wk-bar{width:100%;border-radius:6px;}
+.wk-xp{font-size:8px;color:var(--muted);}
+.lvl-row{display:flex;align-items:center;gap:10px;padding:12px 16px;
+  border-bottom:1px solid var(--border);}
+.lvl-row:last-child{border-bottom:none;}
+.lvl-name{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;width:88px;}
+.lvl-xp{font-size:11px;color:var(--muted);flex:1;}
+.lvl-tag{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:800;
+  color:var(--gold);padding:3px 10px;border-radius:8px;
+  background:rgba(197,165,114,.15);border:1px solid rgba(197,165,114,.25);}
+
+/* ── Parent PIN overlay ── */
+.pin-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  z-index:300;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:24px;animation:fUp .2s ease;}
+.pin-modal{background:var(--card);border-radius:28px;padding:28px 24px;
+  width:100%;max-width:310px;text-align:center;position:relative;
+  border:1.5px solid var(--border);}
+.pin-x{position:absolute;top:14px;right:14px;background:var(--card2);border:none;
+  border-radius:50%;width:30px;height:30px;font-size:14px;cursor:pointer;
+  color:var(--sub);-webkit-tap-highlight-color:transparent;}
+.pin-dots{display:flex;justify-content:center;gap:12px;margin:20px 0;}
+.pdot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border);transition:all .15s;}
+.pdot.on{background:var(--gold);border-color:var(--gold);}
+.pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.pkey{background:var(--card2);border:1.5px solid var(--border);border-radius:16px;color:var(--text);
+  font-size:22px;font-weight:600;padding:14px 10px;cursor:pointer;
+  font-family:inherit;-webkit-tap-highlight-color:transparent;transition:background .1s;text-align:center;}
+.pkey:active{background:var(--glass);}
+.pkey.sm{font-size:14px;color:var(--sub);}
+
+/* ── Parent view ── */
+.p-pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
+.p-pill{display:inline-flex;align-items:center;gap:4px;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;}
+.p-row{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.p-row:last-child{border-bottom:none;}
+.p-row.done{color:var(--muted);}
+.p-sec{margin-bottom:20px;}
+.p-hd{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;
+  letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px;}
+
+/* ── Verse screen ── */
+.verse-screen{flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:44px 32px 64px;text-align:center;
+  background:#16141E;}
+.v-q{font-size:22px;line-height:1.65;color:#F5F5F7;font-style:italic;margin-bottom:14px;}
+.v-ref{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;
+  color:#C5A572;letter-spacing:.08em;margin-bottom:56px;}
+.v-btn{background:linear-gradient(135deg,rgba(197,165,114,.25),rgba(197,165,114,.1));
+  border:1.5px solid rgba(197,165,114,.5);border-radius:30px;
+  padding:14px 40px;font-family:'Barlow Condensed',sans-serif;font-size:18px;
+  font-weight:800;color:#C5A572;letter-spacing:.1em;text-transform:uppercase;
+  cursor:pointer;opacity:0;transition:opacity .9s ease;-webkit-tap-highlight-color:transparent;}
+
+/* ── Profile overlay — ported from profile-guide.html ── */
+.profile-overlay{position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;
+  background:var(--bg);animation:slideUp .35s cubic-bezier(.32,1,.36,1) forwards;}
+@keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+.profile-hdr{display:flex;align-items:center;gap:12px;padding:env(safe-area-inset-top,44px) 16px 0;flex-shrink:0;}
+.profile-close{background:var(--card2);border:none;border-radius:50%;width:32px;height:32px;font-size:16px;
+  cursor:pointer;color:var(--sub);-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;}
+.profile-tabs{display:flex;flex:1;gap:4px;background:var(--card2);border-radius:14px;padding:3px;}
+.ptab{flex:1;text-align:center;padding:7px 4px;border-radius:10px;font-family:'Barlow Condensed',sans-serif;
+  font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+  cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .15s;}
+.ptab.on{background:var(--bg);color:var(--text);}
+.id-hero{background:linear-gradient(135deg,rgba(197,165,114,.22) 0%,rgba(30,26,46,.95) 65%);
+  border:1.5px solid rgba(197,165,114,.28);border-radius:var(--r);padding:20px;margin-bottom:12px;}
+.id-top{display:flex;align-items:center;gap:14px;margin-bottom:16px;}
+.id-avatar{width:64px;height:64px;border-radius:20px;overflow:hidden;border:2px solid var(--gold);flex-shrink:0;}
+.id-name{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:800;color:var(--text);line-height:1;}
+.id-level{display:inline-block;background:linear-gradient(135deg,var(--gold),#D4B87A);color:#16141E;
+  font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;letter-spacing:.06em;
+  text-transform:uppercase;padding:4px 12px;border-radius:20px;margin-top:4px;}
+.id-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.id-stat{text-align:center;}
+.id-stat-n{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:800;color:var(--text);}
+.id-stat-l{font-size:10px;color:var(--muted);margin-top:1px;}
+.commit-card{background:var(--card);border-radius:var(--r);border:1.5px solid var(--border);padding:16px;margin-bottom:8px;}
+.commit-lbl{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:800;
+  letter-spacing:.14em;text-transform:uppercase;margin-bottom:4px;}
+.commit-q{font-size:10px;color:var(--muted);margin-bottom:6px;font-style:italic;}
+.commit-a{font-size:14px;color:var(--text);line-height:1.5;font-weight:500;}
+.pb-intro{font-size:14px;color:var(--sub);line-height:1.7;margin-bottom:16px;padding:14px 16px;
+  background:var(--card);border-radius:var(--r);border:1.5px solid var(--border);}
+.pb-intro strong{color:var(--text);}
+.pb-section{background:var(--card);border-radius:var(--r);border:1.5px solid var(--border);overflow:hidden;margin-bottom:8px;}
+.pb-sec-hd{display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;transition:background .1s;}
+.pb-sec-ico{font-size:22px;flex-shrink:0;}
+.pb-sec-title{font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:800;color:var(--text);flex:1;letter-spacing:.02em;}
+.pb-sec-arrow{color:var(--muted);font-size:18px;transition:transform .25s;}
+.pb-sec-arrow.open{transform:rotate(90deg);}
+.pb-body{padding:0 16px 16px;display:none;}
+.pb-body.open{display:block;}
+.pb-body p{font-size:14px;color:var(--sub);line-height:1.75;margin-bottom:12px;}
+.pb-body p:last-child{margin-bottom:0;}
+.pb-body strong{color:var(--text);}
+.pb-body em{color:var(--gold);font-style:normal;font-weight:600;}
+.xp-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+.xp-row:last-child{border-bottom:none;}
+.xp-action{font-size:13px;color:var(--text);flex:1;}
+.xp-val{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;color:var(--gold);white-space:nowrap;}
+.stat-explain{padding:10px 0;border-bottom:1px solid var(--border);}
+.stat-explain:last-child{border-bottom:none;}
+.stat-name{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;color:var(--text);margin-bottom:3px;}
+.stat-desc{font-size:12px;color:var(--sub);line-height:1.5;}
+.lvl-explain{padding:10px 0;border-bottom:1px solid var(--border);display:flex;gap:10px;}
+.lvl-explain:last-child{border-bottom:none;}
+.lvl-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:4px;}
+.lvl-name-e{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;width:72px;flex-shrink:0;}
+.lvl-desc-e{font-size:12px;color:var(--sub);line-height:1.5;}
+.settings-row{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--card);
+  border-radius:var(--r);border:1.5px solid var(--border);margin-bottom:8px;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;transition:background .1s;}
+.settings-ico{font-size:22px;flex-shrink:0;}
+.settings-body{flex:1;}
+.settings-lbl{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;color:var(--text);letter-spacing:.02em;}
+.settings-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.settings-arrow{color:var(--muted);font-size:18px;}
+.toggle-row{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--card);
+  border-radius:var(--r);border:1.5px solid var(--border);margin-bottom:8px;}
+.toggle-body{flex:1;}
+.toggle-lbl{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;color:var(--text);letter-spacing:.02em;}
+.toggle-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.toggle-sw{width:44px;height:26px;border-radius:13px;background:var(--card2);position:relative;
+  cursor:pointer;transition:background .2s;border:1.5px solid var(--border);}
+.toggle-sw.on{background:var(--green);}
+.toggle-sw::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;
+  border-radius:50%;background:white;transition:transform .2s;}
+.toggle-sw.on::after{transform:translateX(18px);}
+.sport-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.sport-chip{padding:6px 14px;border-radius:20px;font-family:'Barlow Condensed',sans-serif;font-size:12px;
+  font-weight:800;letter-spacing:.04em;border:1.5px solid;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .15s;}
+.sport-chip.on{background:rgba(196,30,58,.15);border-color:rgba(196,30,58,.4);color:var(--red);}
+.sport-chip.off{border-color:var(--border);color:var(--muted);}
+.season-card{background:linear-gradient(135deg,rgba(74,144,217,.18) 0%,rgba(30,26,46,.95) 65%);
+  border:1.5px solid rgba(74,144,217,.28);border-radius:var(--r);padding:16px;margin-bottom:8px;}
+
+/* ── Stats screen — ported from stats-screen.html ── */
+.card{background:var(--card);border-radius:var(--r);border:1.5px solid var(--border);padding:16px;}
+.nums-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px;}
+.num-card{background:var(--card);border-radius:var(--r);border:1.5px solid var(--border);
+  padding:14px 16px;position:relative;overflow:hidden;}
+.num-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:var(--nc);border-radius:var(--r) var(--r) 0 0;}
+.num-big{font-family:'Barlow Condensed',sans-serif;font-size:44px;font-weight:800;
+  color:var(--nc);line-height:1;letter-spacing:-.01em;}
+.num-lbl{font-size:11px;color:var(--sub);margin-top:4px;line-height:1.3;}
+.heatmap-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:4px;padding-bottom:4px;}
+.heatmap-scroll::-webkit-scrollbar{display:none;}
+.heatmap-inner{display:flex;gap:4px;padding:2px;}
+.hm-week{display:flex;flex-direction:column;gap:3px;flex-shrink:0;}
+.hm-day{width:22px;height:22px;border-radius:6px;}
+.hm-labels{display:flex;gap:4px;margin-bottom:6px;}
+.hm-month-lbl{font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;
+  text-transform:uppercase;color:var(--muted);width:22px;flex-shrink:0;text-align:center;overflow:hidden;}
+.h0{background:rgba(255,255,255,.05);}.h1{background:rgba(197,165,114,.15);}
+.h2{background:rgba(197,165,114,.35);}.h3{background:rgba(197,165,114,.6);}
+.h4{background:rgba(197,165,114,.85);}.h5{background:#C5A572;box-shadow:0 0 6px rgba(197,165,114,.4);}
+.hm-legend{display:flex;align-items:center;gap:6px;margin-top:8px;}
+.hm-leg-lbl{font-size:10px;color:var(--muted);}
+.hm-leg-dots{display:flex;gap:3px;}
+.hm-leg-dot{width:14px;height:14px;border-radius:4px;}
+.streak-compare{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.sc-card{background:var(--card);border-radius:var(--r);border:1.5px solid var(--border);padding:14px;text-align:center;}
+.sc-big{font-family:'Barlow Condensed',sans-serif;font-size:40px;font-weight:800;line-height:1;}
+.sc-lbl{font-size:10px;color:var(--sub);margin-top:4px;}
+.sc-badge{display:inline-block;font-size:10px;font-weight:700;font-family:'Barlow Condensed',sans-serif;
+  text-transform:uppercase;letter-spacing:.06em;padding:3px 8px;border-radius:8px;margin-top:6px;}
+.pace-card{background:linear-gradient(135deg,rgba(197,165,114,.2) 0%,rgba(30,26,46,.95) 65%);
+  border:1.5px solid rgba(197,165,114,.3);border-radius:var(--r);padding:16px;}
+.pace-top{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.pace-icon{font-size:28px;}
+.pace-title{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:800;color:var(--gold);letter-spacing:.02em;}
+.pace-sub{font-size:11px;color:var(--sub);margin-top:2px;}
+.pace-levels{display:flex;flex-direction:column;gap:6px;}
+.pace-row{display:flex;align-items:center;gap:8px;}
+.pace-lbl{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;width:72px;flex-shrink:0;}
+.pace-bar-wrap{flex:1;height:6px;background:rgba(255,255,255,.08);border-radius:10px;overflow:hidden;}
+.pace-bar-fill{height:100%;border-radius:10px;}
+.pace-date{font-size:10px;color:var(--sub);white-space:nowrap;width:70px;text-align:right;flex-shrink:0;}
+.cat-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
+.cat-row:last-child{border-bottom:none;}
+.cat-ico-sm{font-size:18px;width:24px;text-align:center;flex-shrink:0;}
+.cat-name{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.04em;width:80px;flex-shrink:0;}
+.cat-bar-wrap{flex:1;height:7px;background:rgba(255,255,255,.08);border-radius:10px;overflow:hidden;}
+.cat-bar-fill{height:100%;border-radius:10px;}
+.cat-pct{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;width:36px;text-align:right;flex-shrink:0;}
+.cat-count{font-size:10px;color:var(--muted);width:40px;text-align:right;flex-shrink:0;}
+.habit-insights{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.hi-card{background:var(--card);border-radius:var(--r);border:1.5px solid var(--border);padding:14px;}
+.hi-tag{font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:800;
+  letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;}
+.hi-habit{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;line-height:1.3;}
+.hi-stat{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;line-height:1;}
+.hi-sub{font-size:10px;color:var(--muted);margin-top:2px;}
+.best-day{background:linear-gradient(135deg,rgba(196,30,58,.2) 0%,rgba(30,26,46,.95) 65%);
+  border:1.5px solid rgba(196,30,58,.3);border-radius:var(--r);padding:16px;display:flex;align-items:center;gap:14px;}
+.best-day-ico{font-size:36px;}
+.best-day-n{font-family:'Barlow Condensed',sans-serif;font-size:40px;font-weight:800;color:var(--red);line-height:1;}
+.best-day-lbl{font-size:12px;color:var(--sub);margin-top:2px;}
+.best-day-date{font-size:11px;color:var(--muted);margin-top:3px;}
+.badges-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.badge-item{display:flex;flex-direction:column;align-items:center;gap:5px;}
+.badge-circle{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;position:relative;}
+.badge-circle.earned{background:linear-gradient(135deg,var(--bc) 0%,rgba(30,26,46,.8) 100%);
+  border:2px solid var(--bc);box-shadow:0 0 12px rgba(var(--bcr),var(--bcg),var(--bcb),.3);}
+.badge-circle.locked{background:rgba(255,255,255,.04);border:2px solid rgba(255,255,255,.08);}
+.badge-circle.locked::after{content:'🔒';font-size:18px;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);}
+.badge-circle.locked span{opacity:0.2;}
+.badge-name{font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:800;
+  letter-spacing:.04em;text-transform:uppercase;color:var(--muted);text-align:center;line-height:1.2;}
+.report-card{display:flex;flex-direction:column;gap:6px;}
+.rc-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
+.rc-row:last-child{border-bottom:none;}
+.rc-ico{font-size:16px;width:20px;text-align:center;}
+.rc-name{font-size:13px;color:var(--text);flex:1;}
+.rc-grade{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;width:30px;text-align:center;}
+
+/* ── Buttons ── */
+.btn{display:flex;align-items:center;justify-content:center;padding:15px 20px;
+  border-radius:var(--r);border:none;font-size:16px;font-weight:700;cursor:pointer;
+  font-family:inherit;width:100%;-webkit-tap-highlight-color:transparent;transition:transform .1s;}
+.btn:active{transform:scale(.98);}
+.btn-red{background:linear-gradient(135deg,#C41E3A,#A01830);color:white;}
+.btn-ghost{background:var(--card);color:var(--sub);border:1.5px solid var(--border);}
+.btn.dim{opacity:.35;}
+
+/* ── Toast (pure CSS animation) ── */
+@keyframes toastLife{
+  0%  {transform:translateX(-50%) translateY(0);opacity:1;}
+  75% {transform:translateX(-50%) translateY(0);opacity:1;}
+  100%{transform:translateX(-50%) translateY(20px);opacity:0;}
+}
+.toast{position:fixed;bottom:130px;left:50%;
+  transform:translateX(-50%) translateY(0);
+  background:var(--card2);border:1.5px solid var(--border);
+  border-radius:24px;padding:10px 22px;font-size:14px;font-weight:600;
+  white-space:nowrap;z-index:9999;pointer-events:none;opacity:0;}
+.toast.up{animation:toastLife 2.6s ease forwards;}
+
+/* ── Misc ── */
+@keyframes fUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+.fin{animation:fUp .22s ease forwards;}
+.gap{height:12px;}.gap2{height:20px;}
+.page-hd{display:flex;align-items:flex-start;justify-content:space-between;
+  padding:env(safe-area-inset-top,44px) 14px 12px;flex-shrink:0;}
+.page-title{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:800;
+  color:var(--text);line-height:1;letter-spacing:.02em;}
+.page-sub{font-size:12px;color:var(--muted);margin-top:3px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" class="toast"></div>
+<!-- Fill in config.js with your own Firebase + Gemini keys — see SETUP.md -->
+<script src="config.js"></script>
+<script>
+function logo(sz){
+  return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 100 100">'+
+    '<circle cx="50" cy="50" r="49" fill="#221F2E"/>'+
+    '<circle cx="50" cy="50" r="46.5" fill="none" stroke="#C5A572" stroke-width="2.2"/>'+
+    '<polygon points="50,13 57.8,32 79.5,32.8 63.2,46.2 68.8,67.5 50,55.5 31.2,67.5 36.8,46.2 20.5,32.8 42.2,32" fill="none" stroke="#C5A572" stroke-width="1.8" stroke-linejoin="round"/>'+
+    '<rect x="47" y="15" width="6" height="68" fill="white" rx="1.5"/>'+
+    '<rect x="26" y="29" width="48" height="6" fill="white" rx="1.5"/>'+
+    '<text x="36" y="57" font-family="Barlow Condensed,sans-serif" font-weight="700" font-size="16" fill="white" text-anchor="middle">N</text>'+
+    '<text x="64" y="57" font-family="Barlow Condensed,sans-serif" font-weight="700" font-size="16" fill="white" text-anchor="middle">P</text>'+
+  '</svg>';
+}
+
+/* ══════════════════════════════════════════════════════════
+   FIREBASE — init, Firestore sync, verse fetch, Gemini call,
+   push notifications. Everything in this block is additive on
+   top of the approved prototype below; the render/bind code
+   further down is untouched except where noted with FIREBASE.
+   ══════════════════════════════════════════════════════════ */
+var fbApp=null, db=null, auth=null, messaging=null, fbReady=false;
+var saveTimer=null;
+
+function fbInit(){
+  var cfg=window.APP_CONFIG||{};
+  if(!cfg.firebase || cfg.firebase.apiKey==='PASTE_FIREBASE_API_KEY'){
+    console.warn('[Nolan App] config.js not filled in yet — running in local-only mode. See SETUP.md.');
+    return;
+  }
+  try{
+    fbApp=firebase.initializeApp(cfg.firebase);
+    db=firebase.firestore();
+    auth=firebase.auth();
+    // Anonymous auth is enough here — Firestore rules gate what an
+    // authenticated (vs anonymous) request can touch. Swap for real
+    // parent sign-in (email link / Google) if you want proper login.
+    auth.signInAnonymously().catch(function(e){console.error('Auth error',e);});
+    auth.onAuthStateChanged(function(user){
+      if(user){ fbReady=true; fbLoadState(); fbListenState(); }
+    });
+    if(firebase.messaging.isSupported && firebase.messaging.isSupported()){
+      messaging=firebase.messaging();
+    }
+  }catch(e){
+    console.error('[Nolan App] Firebase init failed — check config.js values.',e);
+  }
+}
+
+function fbLoadState(){
+  if(!db) return;
+  db.doc(window.APP_CONFIG.docIds.nolanState).get().then(function(snap){
+    if(snap.exists){
+      var d=snap.data();
+      // Merge saved fields onto defaults without clobbering local-only UI state (scr/tab/etc.)
+      ['streak','xp','xpMax','habits','goals'].forEach(function(k){
+        if(d[k]!==undefined) S[k]=d[k];
+      });
+      render();
+    }else{
+      fbSaveState(); // first run — seed Firestore with the defaults below
+    }
+  }).catch(function(e){console.error('Load state failed',e);});
+
+  db.doc(window.APP_CONFIG.docIds.security).get().then(function(snap){
+    S.pin = (snap.exists && snap.data().pin) ? snap.data().pin : '1234';
+    if(!snap.exists) db.doc(window.APP_CONFIG.docIds.security).set({pin:'1234'});
+  }).catch(function(e){console.error('Load PIN failed',e);});
+}
+
+function fbListenState(){
+  if(!db) return;
+  // Real-time sync so Matt and Jen's parent views update live from
+  // whichever device (Nolan's or a parent's) last made a change.
+  db.doc(window.APP_CONFIG.docIds.nolanState).onSnapshot(function(snap){
+    if(!snap.exists) return;
+    var d=snap.data();
+    ['streak','xp','xpMax','habits','goals'].forEach(function(k){
+      if(d[k]!==undefined) S[k]=d[k];
+    });
+    if(S.scr==='main') render();
+  });
+}
+
+function fbSaveState(){
+  if(!db || !fbReady) return;
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(function(){
+    db.doc(window.APP_CONFIG.docIds.nolanState).set({
+      streak:S.streak, xp:S.xp, xpMax:S.xpMax, habits:S.habits, goals:S.goals,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    },{merge:true}).catch(function(e){console.error('Save state failed',e);});
+  },400); // debounce so rapid taps don't spam writes
+}
+
+function fbSavePin(newPin){
+  if(!db) { S.pin=newPin; return Promise.resolve(); }
+  return db.doc(window.APP_CONFIG.docIds.security).set({pin:newPin},{merge:true})
+    .then(function(){ S.pin=newPin; });
+}
+
+/* ── Daily verse — Our Manna API ── */
+function fetchDailyVerse(){
+  var todayKey='verse_'+new Date().toISOString().slice(0,10);
+  var cached=null;
+  try{cached=JSON.parse(localStorage.getItem(todayKey)||'null');}catch(e){}
+  if(cached){ S.verse=cached; return; }
+
+  fetch('https://beta.ourmanna.com/api/v1/get/?format=json&order=daily')
+    .then(function(r){return r.json();})
+    .then(function(data){
+      var v=data && data.verse && data.verse.details;
+      if(v && v.text){
+        S.verse={text:v.text, ref:v.reference+' · '+(v.version||'NIV')};
+        localStorage.setItem(todayKey, JSON.stringify(S.verse));
+        if(S.scr==='verse'||S.tab==='home') render();
+      }
+    })
+    .catch(function(e){ console.warn('Verse fetch failed, using fallback verse.',e); });
+}
+
+/* ── Gemini goal suggestions — called once at onboarding ── */
+function fetchGeminiSuggestions(onboardingAnswers){
+  var key=window.APP_CONFIG && window.APP_CONFIG.geminiApiKey;
+  if(!key || key==='PASTE_GEMINI_API_KEY') return Promise.resolve(null); // fall back to static EXAMPLES
+
+  var prompt='You are helping a 13-year-old athlete/musician set personal goals. '+
+    'He plays soccer, baseball, basketball, cross country and track, and is in band. '+
+    'His answers about himself: '+JSON.stringify(onboardingAnswers)+'. '+
+    'Write 4 short (under 12 words), specific, encouraging goal suggestions for EACH of these time '+
+    'horizons: yearly, monthly, weekly. Non-prescriptive — suggestions, not orders. '+
+    'Respond ONLY with JSON in the shape {"yearly":[...4 strings],"monthly":[...4],"weekly":[...4]} — no markdown fences, no preamble.';
+
+  return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key='+key,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
+  })
+  .then(function(r){return r.json();})
+  .then(function(data){
+    var txt=data.candidates && data.candidates[0] && data.candidates[0].content.parts[0].text;
+    var clean=(txt||'').replace(/```json|```/g,'').trim();
+    var parsed=JSON.parse(clean);
+    if(parsed.yearly && parsed.monthly && parsed.weekly) return parsed;
+    throw new Error('Unexpected Gemini response shape');
+  })
+  .catch(function(e){
+    console.warn('Gemini suggestion call failed, using fallback EXAMPLES.',e);
+    return null;
+  });
+}
+
+/* ── Push notifications (FCM) ──
+   The client can only REQUEST permission and register a token here.
+   Actually sending "Nolan finished all his habits!" to Matt & Jen's
+   phones needs a small server-side trigger — see /functions/index.js
+   in the project for a Cloud Function that watches this Firestore
+   doc and sends the push. That function is NOT something a static
+   GitHub Pages site can run; it needs to be deployed to Firebase
+   Cloud Functions (see SETUP.md, Step 5). */
+function setupPush(parentDocId){
+  if(!messaging || !window.APP_CONFIG.vapidKey || window.APP_CONFIG.vapidKey==='PASTE_VAPID_KEY') return;
+  Notification.requestPermission().then(function(perm){
+    if(perm!=='granted') return;
+    messaging.getToken({vapidKey:window.APP_CONFIG.vapidKey}).then(function(token){
+      if(token && db) db.doc(parentDocId).set({fcmToken:token},{merge:true});
+    }).catch(function(e){console.warn('Push token fetch failed',e);});
+  });
+}
+
+var S={
+  scr:'verse',tab:'home',goalsTab:'cat',
+  goalType:'once',freqN:3,hor:'yearly',picked:null,addedTitle:'',goalAdded:false,addedGoal:null,
+  pin:'1234',
+  verse:{text:'I can do all things through Christ who strengthens me.', ref:'Philippians 4:13 · NIV'},
+  streak:7,xp:340,xpMax:3000,
+  habits:[
+    {id:'h1',lbl:'Read my Bible',         cat:'Faith', clr:'#C5A572',done:true},
+    {id:'h2',lbl:'Make my bed',           cat:'Habits',clr:'#F59E0B',done:true},
+    {id:'h3',lbl:'Foot skills — 20 min',  cat:'Soccer',clr:'#C41E3A',done:false},
+    {id:'h4',lbl:'Homework before dinner',cat:'School',clr:'#4A90D9',done:false},
+    {id:'h5',lbl:'Read 30 minutes',       cat:'Habits',clr:'#F59E0B',done:false},
+    {id:'h6',lbl:'Practice my part',      cat:'Band',  clr:'#9B72CF',done:false},
+  ],
+  goals:[
+    {id:'g1',t:'Make the N1 team',            pct:60, done:false,hor:'Yearly'},
+    {id:'g2',t:'Improve first touch',          pct:20, done:false,hor:'Monthly'},
+    {id:'g3',t:'Attend all summer practices',  pct:100,done:true, hor:'Monthly'},
+  ],
+};
+
+var EXAMPLES={
+  yearly:['Earn your spot at the next competitive level','Set a performance goal for this season','Become the hardest worker on your team','Build something you are proud of by December'],
+  monthly:['Improve your weakest skill this month','Add something new to your game','Be more consistent in training','Tackle the thing you have been avoiding'],
+  weekly:['Get extra reps outside of practice this week','Study the game — watch film','Give everything in every session this week','Do one thing today your future self will thank you for'],
+};
+
+function go(scr){S.scr=scr;render();}
+
+function toast(msg,clr){
+  var el=document.getElementById('toast');
+  el.textContent=msg;el.style.color=clr||'#C5A572';
+  el.classList.remove('up');
+  void el.offsetWidth;
+  el.classList.add('up');
+}
+
+function render(){
+  var app=document.getElementById('app');
+  var h='';
+  if(S.scr==='verse')   h=sVerse();
+  else if(S.scr==='main')  h=sMain();
+  else if(S.scr==='ath')   h=sAth();
+  else if(S.scr==='addg')  h=sAddGoal();
+  else if(S.scr==='pdash') h=sParentDash();
+  app.innerHTML=h;
+  bind();
+  if(S.scr==='verse') setTimeout(function(){var b=document.getElementById('vbtn');if(b)b.style.opacity='1';},2500);
+}
+
+function nav(){
+  var tabs=[{id:'home',ico:'🏠',l:'Home'},{id:'goals',ico:'🏆',l:'Goals'},{id:'habits',ico:'⚡',l:'Habits'},{id:'stats',ico:'📊',l:'Stats'}];
+  return '<div class="bot-nav">'+tabs.map(function(t){
+    return '<div class="ni'+(S.tab===t.id?' on':'')+'" data-tab="'+t.id+'">'+
+      '<span class="ni-ico">'+t.ico+'</span><div class="ni-lbl">'+t.l+'</div></div>';
+  }).join('')+'</div>';
+}
+
+function sVerse(){
+  return '<div style="display:flex;flex-direction:column;height:100%;background:#16141E">'+
+    '<div class="verse-screen">'+
+      '<div style="margin-bottom:44px">'+logo(80)+'</div>'+
+      '<div class="v-q">&ldquo;'+esc(S.verse.text)+'&rdquo;</div>'+
+      '<div class="v-ref">'+esc(S.verse.ref)+'</div>'+
+      '<button id="vbtn" class="v-btn">Let&rsquo;s go &rarr;</button>'+
+    '</div>'+
+  '</div>';
+}
+
+function sMain(){
+  var body=S.tab==='home'?sHome():S.tab==='goals'?sGoals():S.tab==='habits'?sHabits():sStats();
+  return '<div style="display:flex;flex-direction:column;height:100%">'+body+nav()+'</div>';
+}
+
+function sHome(){
+  var done=S.habits.filter(function(h){return h.done;}).length;
+  var pct=Math.round(S.xp/S.xpMax*100);
+
+  var dots=S.habits.map(function(h){
+    return '<div class="hdot" style="background:'+(h.done?h.clr:'rgba(255,255,255,.1)')+'"></div>';
+  }).join('');
+
+  var chk=S.habits.map(function(h){
+    return '<div class="chk-row" data-tog="'+h.id+'">'+
+      '<div class="chk-box'+(h.done?' done':'')+'" style="'+(h.done?'background:'+h.clr+';border-color:'+h.clr+';':'')+'">'+(h.done?'✓':'')+'</div>'+
+      '<div class="row-lbl'+(h.done?' done':'')+'")>'+esc(h.lbl)+'</div>'+
+      '<div class="row-cat" style="color:'+h.clr+'">'+h.cat+'</div>'+
+    '</div>';
+  }).join('');
+
+  return '<div class="game-hdr">'+
+    '<div class="avatar" id="avatar-btn" style="cursor:pointer">'+logo(52)+'</div>'+
+    '<div class="hdr-info">'+
+      '<div class="hdr-name">Hey, Nolan! 👋</div>'+
+      '<div class="hdr-date">Thursday, July 16</div>'+
+      '<div class="hdr-badges" style="margin-top:5px">'+
+        '<div class="badge badge-fire">🔥 '+S.streak+' day streak</div>'+
+        '<div class="badge badge-xp">⚡ '+S.xp+' XP</div>'+
+      '</div>'+
+    '</div>'+
+    '<button id="theme-btn" class="hdr-theme">☀️</button>'+
+    '<button id="lock-btn" class="hdr-lock">🔒</button>'+
+  '</div>'+
+  '<div class="scroll fin">'+
+
+    '<div class="xp-card">'+
+      '<div class="xp-top">'+
+        '<div class="level-badge">⚡ Amateur</div>'+
+        '<div class="xp-info">'+
+          '<div class="xp-nums" id="xpnums">'+S.xp+' / '+S.xpMax+' XP</div>'+
+          '<div class="xp-next">Next: Prospect</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="xp-bar-wrap"><div class="xp-bar-fill" id="xpbar" style="width:'+pct+'%"></div></div>'+
+    '</div>'+
+
+    '<div class="verse-card">'+
+      '<div class="verse-cross">✝️</div>'+
+      '<div class="verse-body">'+
+        '<div class="verse-label">Daily Verse</div>'+
+        '<div class="verse-txt">&ldquo;'+esc(S.verse.text)+'&rdquo;</div>'+
+        '<div class="verse-ref">'+esc(S.verse.ref)+'</div>'+
+      '</div>'+
+    '</div>'+
+
+    '<div class="sec">Today&rsquo;s Missions — '+done+'/'+S.habits.length+' done</div>'+
+    '<div class="chk-list">'+chk+'</div>'+
+
+    '<div class="hab-strip" data-tab="habits">'+
+      '<div class="hab-top">'+
+        '<div class="hab-icon">⚡</div>'+
+        '<div class="hab-info">'+
+          '<div class="hab-lbl">Daily Habits</div>'+
+          '<div class="hab-sub">Tap to manage your daily habits</div>'+
+        '</div>'+
+        '<div class="hab-pct">'+Math.round(done/S.habits.length*100)+'%</div>'+
+      '</div>'+
+      '<div class="hab-dots">'+dots+'</div>'+
+    '</div>'+
+
+  '</div>';
+}
+
+function sGoals(){
+  var cats=[
+    {l:'Faith',    ico:'✝️', clr:'#C5A572',sub:'1 of 2 complete',pct:50,
+     glow:'rgba(197,165,114,0.28)',brd:'rgba(197,165,114,0.35)'},
+    {l:'Academics',ico:'📚', clr:'#4A90D9',sub:'0 of 3 complete',pct:0,
+     glow:'rgba(74,144,217,0.28)',brd:'rgba(74,144,217,0.35)'},
+    {l:'Athletics',ico:'🏆', clr:'#C41E3A',sub:'⚽ Soccer active',pct:30,
+     glow:'rgba(196,30,58,0.28)',brd:'rgba(196,30,58,0.35)'},
+    {l:'Creative', ico:'🎵', clr:'#9B72CF',sub:'First chair 🎺', pct:75,
+     glow:'rgba(155,114,207,0.28)',brd:'rgba(155,114,207,0.35)'},
+  ];
+
+  var grid=cats.map(function(c){
+    return '<div class="cat-card" style="--ac:'+c.clr+';--ac-glow:'+c.glow+';--ac-border:'+c.brd+'" data-go="ath">'+
+      '<div class="cat-card-inner">'+
+        '<span class="cat-icon">'+c.ico+'</span>'+
+        '<div class="cat-lbl">'+c.l+'</div>'+
+        '<div class="cat-stat">'+c.sub+'</div>'+
+        '<div class="cat-pbar"><div class="cat-pfill" style="width:'+c.pct+'%;background:'+c.clr+'"></div></div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+
+  function tcard(ico,title,clr,pct,badge,val){
+    var bar=typeof pct==='number'
+      ? '<div class="tc-bar"><div class="tc-fill" style="width:'+pct+'%;background:'+clr+'"></div></div>' : '';
+    var bdg=badge?'<span class="freq-badge">🔁 '+badge+'</span>':'';
+    return '<div class="t-card" style="--tc:'+clr+';border-left-color:'+clr+'">'+
+      '<div class="tc-top"><span class="tc-icon">'+ico+'</span>'+
+        '<div style="flex:1"><div class="tc-title">'+title+bdg+'</div>'+
+        '<div class="tc-val">'+val+'</div>'+bar+'</div></div></div>';
+  }
+
+  var timeV=
+    '<div class="t-sec">'+
+      '<div class="t-hd"><div class="t-lbl" style="color:#C5A572">🏔 Yearly</div>'+
+        '<div class="t-line" style="background:#C5A572"></div><div class="t-cnt">3 goals</div></div>'+
+      tcard('⚽','Earn your spot at the next competitive level','#C41E3A',60,null,'60% complete')+
+      tcard('✝️','Make your confirmation year count','#C5A572',null,null,'On track')+
+      tcard('📚','Set a grade target worth working for','#4A90D9',50,null,'50% complete')+
+    '</div>'+
+    '<div class="t-sec">'+
+      '<div class="t-hd"><div class="t-lbl" style="color:#4A90D9">📅 This Month</div>'+
+        '<div class="t-line" style="background:#4A90D9"></div><div class="t-cnt">2 goals</div></div>'+
+      tcard('⚽','Improve your weakest skill this month','#C41E3A',null,'3×/wk','2/3 this week')+
+      tcard('📚','Tackle the assignment you have been avoiding','#4A90D9',null,null,'Due Aug 1')+
+    '</div>'+
+    '<div class="t-sec">'+
+      '<div class="t-hd"><div class="t-lbl" style="color:#9B72CF">📆 This Week</div>'+
+        '<div class="t-line" style="background:#9B72CF"></div><div class="t-cnt">2 goals</div></div>'+
+      tcard('⚽','Get extra reps outside of practice','#C41E3A',40,null,'2/5 days')+
+      tcard('🎵','Be the most prepared player in rehearsal','#9B72CF',30,null,'In progress')+
+    '</div>';
+
+  return '<div class="page-hd"><div><div class="page-title">Goals</div></div>'+logo(36)+'</div>'+
+    '<div class="scroll fin">'+
+      '<div class="g-toggle">'+
+        '<div class="gt'+(S.goalsTab==='cat'?' on':'')+'" data-gtab="cat">Categories</div>'+
+        '<div class="gt'+(S.goalsTab==='time'?' on':'')+'" data-gtab="time">By Time</div>'+
+      '</div>'+
+      (S.goalsTab==='cat'
+        ? '<div class="cat-grid">'+grid+'</div>'+
+          '<div class="hab-strip" style="margin-bottom:0" data-tab="habits">'+
+            '<div class="hab-top"><div class="hab-icon">⚡</div>'+
+              '<div class="hab-info"><div class="hab-lbl">Daily Habits</div>'+
+              '<div class="hab-sub">2 of 6 done today</div></div>'+
+              '<div class="hab-pct">33%</div>'+
+            '</div>'+
+          '</div>'
+        : timeV
+      )+
+    '</div>';
+}
+
+function sAth(){
+  var sports=[{l:'⚽ Soccer',on:true},{l:'⚾ Baseball',on:false},{l:'🏀 Ball',on:false},{l:'⛳ Golf',on:false}];
+  var tabs=sports.map(function(s){return '<div class="s-tab '+(s.on?'on':'off')+'">'+s.l+'</div>';}).join('');
+  var goals=[...S.goals];
+  if(S.goalAdded&&S.addedGoal) goals.push(S.addedGoal);
+  var done=goals.filter(function(g){return g.done;}).length;
+  var glist=goals.map(function(g,i){
+    return '<div class="g-card" data-editg="'+i+'">'+
+      '<div class="g-dot'+(g.done?' done':'')+'")></div>'+
+      '<div style="flex:1"><div class="g-title'+(g.done?' done':'')+'")>'+esc(g.t)+'</div>'+
+        (g.done?'<div class="g-meta">Completed ✓</div>':
+          '<div class="g-hor">'+g.hor+'</div>'+
+          '<div class="g-pbar"><div class="g-pfill" style="width:'+g.pct+'%"></div></div>'+
+          '<div class="g-meta" style="margin-top:4px">'+g.pct+'% complete</div>')+
+      '</div><span class="g-chev">›</span></div>';
+  }).join('');
+
+  return '<div style="display:flex;flex-direction:column;height:100%">'+
+    '<div class="topbar"><button class="back" data-tab="goals">‹ Goals</button>'+
+      '<span class="tbar-title" style="color:#C41E3A">🏆 Athletics</span>'+logo(32)+'</div>'+
+    '<div class="scroll fin">'+
+      '<div class="hero-sec">'+
+        '<div class="hero-sub">Performance, skills, and training goals</div>'+
+        '<div style="display:flex;gap:14px;align-items:baseline">'+
+          '<div><span style="font-family:Barlow Condensed,sans-serif;font-size:26px;font-weight:800;color:var(--text)">'+done+'</span><span style="font-size:10px;color:var(--muted);margin-left:3px">complete</span></div>'+
+          '<div><span style="font-family:Barlow Condensed,sans-serif;font-size:26px;font-weight:800;color:var(--text)">'+(goals.length-done)+'</span><span style="font-size:10px;color:var(--muted);margin-left:3px">in progress</span></div>'+
+          '<div style="font-family:Barlow Condensed,sans-serif;font-size:22px;font-weight:800;color:#C41E3A">'+Math.round(done/goals.length*100)+'%</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="sport-tabs">'+tabs+'</div>'+glist+
+      '<div class="add-btn" data-go="addg">+ Add Soccer Goal</div>'+
+    '</div>'+nav()+'</div>';
+}
+
+function sHabits(){
+  var done=S.habits.filter(function(h){return h.done;}).length;
+  var chk=S.habits.map(function(h){
+    return '<div class="chk-row" data-tog="'+h.id+'">'+
+      '<div class="chk-box'+(h.done?' done':'')+'" style="'+(h.done?'background:'+h.clr+';border-color:'+h.clr+';':'')+'">'+(h.done?'✓':'')+'</div>'+
+      '<div class="row-lbl'+(h.done?' done':'')+'")>'+esc(h.lbl)+'</div>'+
+    '</div>';
+  }).join('');
+  var manage=S.habits.map(function(h){
+    return '<div class="hab-manage"><span style="flex:1;font-size:13px;color:var(--text)">'+esc(h.lbl)+'</span>'+
+      '<span style="font-size:9px;color:var(--muted);font-family:Barlow Condensed,sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:.06em">Daily</span></div>';
+  }).join('');
+
+  return '<div class="page-hd">'+
+    '<div><div class="page-title" style="color:#F59E0B">⚡ Habits</div>'+
+      '<div class="badge badge-fire" style="margin-top:8px;display:inline-flex">🔥 '+S.streak+'-day streak</div></div>'+
+    logo(36)+'</div>'+
+    '<div class="scroll fin">'+
+      '<div class="hero-sec">'+
+        '<div class="hero-sub">The daily things that build a great life</div>'+
+        '<div><span style="font-family:Barlow Condensed,sans-serif;font-size:28px;font-weight:800;color:var(--text)">'+done+'/'+S.habits.length+'</span><span style="font-size:11px;color:var(--muted);margin-left:5px">done today</span></div>'+
+      '</div>'+
+      '<div class="sec">Today</div>'+
+      '<div class="chk-list" style="margin-bottom:20px">'+chk+'</div>'+
+      '<div class="sec">Day-Specific</div>'+
+      '<div class="hab-manage" style="opacity:.4"><span style="flex:1;font-size:13px;color:var(--text)">Take out the trash</span><span style="font-size:9px;color:#F59E0B;font-family:Barlow Condensed,sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:.06em">Monday</span></div>'+
+      '<div class="hab-manage" style="opacity:.4"><span style="flex:1;font-size:13px;color:var(--text)">Take out recycling</span><span style="font-size:9px;color:#F59E0B;font-family:Barlow Condensed,sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:.06em">Thursday</span></div>'+
+      '<div class="sec" style="margin-top:20px">Manage</div>'+manage+
+      '<div class="gap2"></div>'+
+      '<button class="btn" style="background:linear-gradient(135deg,#F59E0B,#E08C00);color:#16141E;font-family:Barlow Condensed,sans-serif;font-size:17px;font-weight:800;letter-spacing:.06em">+ Add Habit</button>'+
+    '</div>';
+}
+
+/* NOTE: XP and streak below are live from S (Firestore). The heat map,
+   category breakdown, habit insights, best-day, and badges need daily
+   history that isn't collected yet — that requires writing a small
+   daily snapshot to Firestore (e.g. a Cloud Function or a client write
+   at day-rollover) so this screen has real data to read instead of the
+   season-sample placeholders marked below. Structure is fully wired;
+   swap the marked arrays for a Firestore read once that history exists. */
+function sStats(){
+  var pct=Math.round(S.xp/S.xpMax*100);
+
+  // ── Heat map (SAMPLE DATA — replace with real daily-completion history) ──
+  var weeks=[
+    [4,3,0,2,3,5,4],[2,4,3,0,4,5,3],[5,3,4,3,0,4,5],[3,2,0,4,5,4,3],
+    [4,5,3,2,4,0,5],[3,4,5,3,2,4,4],[2,3,4,0,5,3,4],[4,3,2,4,5,4,0],
+    [5,4,3,4,2,5,4],[3,4,2,3,4,5,0]
+  ];
+  var monthNames=['Aug','Aug','Aug','Aug','Sep','Sep','Sep','Sep','Oct','Oct'];
+  var prevMonth='', hmLabels='', hmInner='';
+  weeks.forEach(function(week,wi){
+    var lbl=monthNames[wi]!==prevMonth?monthNames[wi]:'';
+    prevMonth=monthNames[wi];
+    hmLabels+='<div class="hm-month-lbl">'+lbl+'</div>';
+    hmInner+='<div class="hm-week">'+week.map(function(lvl,di){
+      var cls=(wi===weeks.length-1 && di>=5)?'h0':'h'+lvl;
+      return '<div class="hm-day '+cls+'" title="'+lvl*50+' XP"></div>';
+    }).join('')+'</div>';
+  });
+
+  // ── Top numbers ── (XP is live; the rest are season-sample placeholders)
+  var nums=[
+    {n:S.xp,l:'Total XP<br>this season',c:'#C5A572'},
+    {n:12,l:'Perfect days<br>all habits done',c:'#30D158'},
+    {n:S.goals.filter(function(g){return g.done;}).length,l:'Goals<br>completed',c:'#C41E3A'},
+    {n:246,l:'Total habits<br>checked off',c:'#F59E0B'}
+  ];
+  var numsHtml=nums.map(function(x){
+    return '<div class="num-card" style="--nc:'+x.c+'"><div class="num-big">'+x.n+'</div><div class="num-lbl">'+x.l+'</div></div>';
+  }).join('');
+
+  var catBreak=[
+    {ico:'✝️',l:'Faith',c:'#C5A572',pct:80,frac:'4/5'},
+    {ico:'🏆',l:'Athletics',c:'#C41E3A',pct:67,frac:'2/3'},
+    {ico:'🎵',l:'Creative',c:'#9B72CF',pct:75,frac:'3/4'},
+    {ico:'📚',l:'Academics',c:'#4A90D9',pct:33,frac:'1/3'}
+  ].map(function(c){
+    return '<div class="cat-row"><div class="cat-ico-sm">'+c.ico+'</div>'+
+      '<div class="cat-name" style="color:'+c.c+'">'+c.l+'</div>'+
+      '<div class="cat-bar-wrap"><div class="cat-bar-fill" style="width:'+c.pct+'%;background:'+c.c+'"></div></div>'+
+      '<div class="cat-pct" style="color:'+c.c+'">'+c.pct+'%</div><div class="cat-count">'+c.frac+'</div></div>';
+  }).join('');
+
+  var insights=[
+    {tag:'💪 Most Consistent',c:'#30D158',h:'Make my bed',v:'94%',s:'of days this season'},
+    {tag:'📈 Needs Work',c:'#C41E3A',h:'Read 30 minutes',v:'48%',s:'of days this season'},
+    {tag:'🔥 Best Day',c:'#F59E0B',h:'Saturday',v:'92%',s:'avg completion rate'},
+    {tag:'😴 Tough Day',c:'#9B72CF',h:'Friday',v:'61%',s:'avg completion rate'}
+  ].map(function(i){
+    return '<div class="hi-card"><div class="hi-tag" style="color:'+i.c+'">'+i.tag+'</div>'+
+      '<div class="hi-habit">'+i.h+'</div><div class="hi-stat" style="color:'+i.c+'">'+i.v+'</div>'+
+      '<div class="hi-sub">'+i.s+'</div></div>';
+  }).join('');
+
+  var badgesEarned=[
+    {ico:'🔥',n:'First Flame',c:'#F59E0B'},{ico:'⚡',n:'Level Up',c:'#C5A572'},
+    {ico:'🎯',n:'First Win',c:'#30D158'},{ico:'🏅',n:'Season Opener',c:'#4A90D9'},
+    {ico:'💪',n:'Perfect Day',c:'#9B72CF'}
+  ];
+  var badgesLocked=['🏆 Week Warrior','⭐ Rising Star','🌟 All-Star Week','🔥 30-Day Streak','👑 MVP','📚 Honor Roll','🏆 Legend'];
+  function hexToRgb(h){var v=parseInt(h.slice(1),16);return (v>>16&255)+','+(v>>8&255)+','+(v&255);}
+  var badgesHtml=badgesEarned.map(function(b){
+    return '<div class="badge-item"><div class="badge-circle earned" style="--bc:'+b.c+';--bcr:'+hexToRgb(b.c).split(',')[0]+';--bcg:'+hexToRgb(b.c).split(',')[1]+';--bcb:'+hexToRgb(b.c).split(',')[2]+'"><span>'+b.ico+'</span></div><div class="badge-name" style="color:'+b.c+'">'+b.n+'</div></div>';
+  }).join('')+badgesLocked.map(function(bl){
+    var parts=bl.split(' ');var ico=parts[0];var n=parts.slice(1).join(' ');
+    return '<div class="badge-item"><div class="badge-circle locked"><span>'+ico+'</span></div><div class="badge-name">'+n+'</div></div>';
+  }).join('');
+
+  var reportCard=[
+    {ico:'✝️',n:'Faith & Character',g:'A',c:'#30D158'},{ico:'🎵',n:'Creative / Band',g:'B+',c:'#C5A572'},
+    {ico:'🏆',n:'Athletics',g:'B',c:'#C5A572'},{ico:'⚡',n:'Daily Habits',g:'B-',c:'#F59E0B'},
+    {ico:'📚',n:'Academics',g:'C+',c:'#C41E3A'}
+  ].map(function(r){
+    return '<div class="rc-row"><div class="rc-ico">'+r.ico+'</div><div class="rc-name">'+r.n+'</div><div class="rc-grade" style="color:'+r.c+'">'+r.g+'</div></div>';
+  }).join('');
+
+  var levels=[
+    {n:'Amateur',x:'Start',c:'#8E8E93',tag:'You are here ←',tagC:'#30D158',tagBg:'rgba(48,209,88,.12)'},
+    {n:'Prospect',x:'3,000 XP',c:'#4A90D9',date:'~Aug 10'},
+    {n:'Pro',x:'12,000 XP',c:'#30D158',date:'~Late Sep'},
+    {n:'All-Star',x:'28,000 XP',c:'#F59E0B',date:'~Dec'},
+    {n:'MVP',x:'52,000 XP',c:'#C41E3A',date:'Next season'},
+    {n:'Legend',x:'75,000 XP',c:'#C5A572',tag:'Year end 🏆',tagC:'#C5A572',tagBg:'rgba(197,165,114,.12)'}
+  ].map(function(l){
+    return '<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border)">'+
+      '<div style="font-family:Barlow Condensed,sans-serif;font-size:15px;font-weight:800;width:88px;color:'+l.c+'">'+l.n+'</div>'+
+      '<div style="font-size:11px;color:var(--muted);flex:1">'+l.x+'</div>'+
+      (l.tag?'<div style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:800;color:'+l.tagC+';padding:3px 10px;border-radius:8px;background:'+l.tagBg+'">'+l.tag+'</div>'
+        :'<div style="font-size:11px;color:var(--muted)">'+l.date+'</div>')+
+    '</div>';
+  }).join('');
+
+  return '<div class="page-hd"><div><div class="page-title">Stats</div><div class="page-sub">Season 1 · Aug–Dec 2025</div></div>'+logo(36)+'</div>'+
+    '<div class="scroll fin">'+
+      '<div class="nums-grid">'+numsHtml+'</div>'+
+      '<div class="sec">Activity Calendar</div>'+
+      '<div class="card"><div class="hm-labels">'+hmLabels+'</div>'+
+        '<div class="heatmap-scroll"><div class="heatmap-inner">'+hmInner+'</div></div>'+
+        '<div class="hm-legend"><div class="hm-leg-lbl">Less</div><div class="hm-leg-dots">'+
+          '<div class="hm-leg-dot h0"></div><div class="hm-leg-dot h2"></div><div class="hm-leg-dot h3"></div>'+
+          '<div class="hm-leg-dot h4"></div><div class="hm-leg-dot h5"></div></div><div class="hm-leg-lbl">More</div></div>'+
+      '</div>'+
+      '<div class="sec">Streak</div>'+
+      '<div class="streak-compare">'+
+        '<div class="sc-card"><div class="sc-big" style="color:#F59E0B">'+S.streak+'</div><div class="sc-lbl">Current streak</div>'+
+          '<div class="sc-badge" style="background:rgba(245,158,11,.14);color:#F59E0B">🔥 Active</div></div>'+
+        '<div class="sc-card"><div class="sc-big" style="color:#C5A572">14</div><div class="sc-lbl">Best streak ever</div>'+
+          '<div class="sc-badge" style="background:rgba(197,165,114,.12);color:#C5A572">🏅 Personal best</div></div>'+
+      '</div>'+
+      '<div class="sec">Best Single Day</div>'+
+      '<div class="best-day"><div class="best-day-ico">⚡</div><div>'+
+        '<div class="best-day-n">240 XP</div><div class="best-day-lbl">Your biggest day ever</div>'+
+        '<div class="best-day-date">Saturday, Aug 10 · All habits + 2 goals completed</div></div></div>'+
+      '<div class="sec">Season Pace</div>'+
+      '<div class="pace-card"><div class="pace-top"><div class="pace-icon">🚀</div><div>'+
+        '<div class="pace-title">At your current pace...</div>'+
+        '<div class="pace-sub">Keep showing up every day and here&rsquo;s where you land</div></div></div>'+
+        '<div class="pace-levels">'+
+          '<div class="pace-row"><div class="pace-lbl" style="color:#8E8E93">Amateur</div><div class="pace-bar-wrap"><div class="pace-bar-fill" style="width:100%;background:#8E8E93"></div></div><div class="pace-date" style="color:#30D158">✓ Done</div></div>'+
+          '<div class="pace-row"><div class="pace-lbl" style="color:#4A90D9">Prospect</div><div class="pace-bar-wrap"><div class="pace-bar-fill" style="width:'+Math.min(100,pct)+'%;background:#4A90D9"></div></div><div class="pace-date" style="color:#4A90D9">~Aug 10</div></div>'+
+          '<div class="pace-row"><div class="pace-lbl" style="color:#30D158">Pro</div><div class="pace-bar-wrap"><div class="pace-bar-fill" style="width:3%;background:#30D158"></div></div><div class="pace-date">~Late Sep</div></div>'+
+          '<div class="pace-row"><div class="pace-lbl" style="color:#F59E0B">All-Star</div><div class="pace-bar-wrap"><div class="pace-bar-fill" style="width:1%;background:#F59E0B"></div></div><div class="pace-date">~Dec</div></div>'+
+          '<div class="pace-row"><div class="pace-lbl" style="color:#C5A572">Legend</div><div class="pace-bar-wrap"><div class="pace-bar-fill" style="width:0%;background:#C5A572"></div></div><div class="pace-date">Next season</div></div>'+
+        '</div></div>'+
+      '<div class="sec">Goal Completion by Category</div><div class="card">'+catBreak+'</div>'+
+      '<div class="sec">Habit Insights</div><div class="habit-insights">'+insights+'</div>'+
+      '<div class="sec">Season Report Card</div><div class="card"><div class="report-card">'+reportCard+'</div></div>'+
+      '<div class="sec">Badges Earned</div><div class="badges-grid">'+badgesHtml+'</div>'+
+      '<div class="sec">Level Progression</div><div class="card" style="padding:0;overflow:hidden">'+levels+'</div>'+
+    '</div>';
+}
+
+function sAddGoal(){
+  var isFreq=S.goalType==='freq';
+  var hors=['yearly','monthly','weekly'];
+  var hbtns=hors.map(function(h){return '<button class="h-btn'+(S.hor===h?' on':'')+'" data-hor="'+h+'">'+cap(h)+'</button>';}).join('');
+  var exs=(EXAMPLES[S.hor]||[]).map(function(e,i){
+    var id='e'+i;var sel=S.picked===id;
+    return '<div class="ex-item'+(sel?' on':'')+'" data-pick="'+id+'" data-etxt="'+esc(e)+'">'+
+      '<div class="ex-txt">'+e+'</div><div class="ex-add"></div></div>';
+  }).join('');
+  var ready=!!(S.picked||(S.addedTitle&&S.addedTitle.trim().length>2));
+
+  return '<div style="display:flex;flex-direction:column;height:100%">'+
+    '<div class="topbar"><button class="back" data-go="ath">‹ Athletics</button><span class="tbar-title">Add Goal</span>'+logo(32)+'</div>'+
+    '<div class="scroll fin">'+
+      '<div class="form-lbl">Goal Type</div>'+
+      '<div class="gtype-row">'+
+        '<div class="gtype'+(S.goalType==='once'?' on':'')+'" data-gtype="once"><span class="gtype-ico">🎯</span><div class="gtype-lbl">One-Time</div><div class="gtype-desc">Work toward a single outcome</div></div>'+
+        '<div class="gtype'+(isFreq?' on':'')+'" data-gtype="freq"><span class="gtype-ico">🔁</span><div class="gtype-lbl">Repeating</div><div class="gtype-desc">X times per week or month</div></div>'+
+      '</div>'+
+      (isFreq?'<div class="form-lbl">Times per week</div>'+
+        '<div class="freq-row"><button class="freq-adj" id="fdown">−</button>'+
+          '<div class="freq-n" id="freqn">'+S.freqN+'</div>'+
+          '<button class="freq-adj" id="fup">+</button></div>'+
+        '<div class="freq-note">🔁 A daily task will appear in your checklist and track <strong>'+S.freqN+'×/week</strong> — auto-resets Monday and earns +75 XP when hit.</div>':'')+
+      '<div class="form-lbl">Time Horizon</div><div class="hor-row">'+hbtns+'</div>'+
+      '<div class="ex-hd">Suggestions — make it yours</div>'+
+      '<div class="ex-note">These are starting points, not answers. Tap one and make it your own.</div>'+exs+
+      '<div class="form-lbl" style="margin-top:16px">Or write your own</div>'+
+      '<textarea id="custgoal" class="f-area" placeholder="Describe your goal in your own words...">'+esc(S.addedTitle||'')+'</textarea>'+
+      '<div class="gap2"></div>'+
+      '<button class="btn btn-red'+(ready?'':' dim')+'" id="saveg">'+(ready?'Save This Goal':'Select a suggestion or write your own')+'</button>'+
+    '</div></div>';
+}
+
+function sParentDash(){
+  var done=S.habits.filter(function(h){return h.done;}).length;
+  var glist=S.goals.map(function(g){
+    return '<div class="p-row'+(g.done?' done':'')+'")><span>'+(g.done?'✅':'⬜')+'</span>'+
+      '<span style="flex:1;'+(g.done?'text-decoration:line-through':'')+'">'+esc(g.t)+'</span>'+
+      (g.pct&&!g.done?'<span style="font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:800;color:#C41E3A">'+g.pct+'%</span>':'')+
+    '</div>';
+  }).join('');
+  var hlist=S.habits.map(function(h){
+    return '<div class="p-row'+(h.done?' done':'')+'")><span>'+(h.done?'✅':'⬜')+'</span><span>'+esc(h.lbl)+'</span></div>';
+  }).join('');
+
+  return '<div style="display:flex;flex-direction:column;height:100%">'+
+    '<div class="topbar">'+logo(32)+'<span class="tbar-title" style="flex:1;text-align:center">Parent View</span>'+
+      '<button id="lock-close" style="background:var(--card2);border:none;border-radius:10px;padding:6px 12px;font-size:12px;color:var(--sub);font-family:inherit;cursor:pointer;font-weight:600">Lock 🔒</button></div>'+
+    '<div class="scroll fin">'+
+      '<div class="p-pills">'+
+        '<div class="p-pill" style="background:rgba(245,158,11,.14);border:1px solid rgba(245,158,11,.3);color:#F59E0B">🔥 '+S.streak+'-day streak</div>'+
+        '<div class="p-pill" style="background:rgba(74,144,217,.1);border:1px solid rgba(74,144,217,.2);color:#4A90D9">📊 78% habits this week</div>'+
+        '<div class="p-pill" style="background:rgba(197,165,114,.1);border:1px solid rgba(197,165,114,.2);color:#C5A572">⚡ Amateur · '+S.xp+' XP</div>'+
+      '</div>'+
+      '<div class="p-sec"><div class="p-hd" style="color:#C41E3A">🏆 Athletics Goals</div>'+
+        '<div class="stat-box" style="padding:0 14px 4px">'+glist+'</div></div>'+
+      '<div class="p-sec"><div class="p-hd" style="color:#F59E0B">⚡ Today&rsquo;s Habits &mdash; '+done+'/'+S.habits.length+'</div>'+
+        '<div class="stat-box" style="padding:0 14px 4px">'+hlist+'</div></div>'+
+      '<button class="btn btn-ghost" id="copy-rpt">📋 Copy Report</button>'+
+      '<div class="gap"></div>'+
+      '<button class="btn btn-ghost" id="change-pin-btn">🔑 Change PIN</button>'+
+    '</div>'+nav()+'</div>';
+}
+
+function showChangePin(){
+  var step='current', cur='', next='', confirmPin='';
+  var ov=document.createElement('div');
+  ov.className='pin-overlay';
+  document.body.appendChild(ov);
+
+  function draw(){
+    var titles={current:'Enter Current PIN', next:'Choose New PIN', confirm:'Confirm New PIN'};
+    var val = step==='current'?cur:step==='next'?next:confirmPin;
+    ov.innerHTML='<div class="pin-modal">'+
+      '<button class="pin-x" id="cpx">✕</button>'+
+      '<div style="font-size:40px;margin-bottom:10px">🔑</div>'+
+      '<div style="font-family:Barlow Condensed,sans-serif;font-size:24px;font-weight:800;color:var(--text);margin-bottom:4px">'+titles[step]+'</div>'+
+      '<div style="font-size:13px;color:var(--muted)">'+(step==='current'?'Shared by Matt & Jen':'4 digits')+'</div>'+
+      '<div class="pin-dots">'+[0,1,2,3].map(function(i){return '<div class="pdot'+(i<val.length?' on':'')+'"></div>';}).join('')+'</div>'+
+      '<div class="pin-grid">'+[1,2,3,4,5,6,7,8,9].map(function(n){return '<button class="pkey" data-cpk="'+n+'">'+n+'</button>';}).join('')+
+        '<button class="pkey sm" data-cpk="clr">CLR</button><button class="pkey" data-cpk="0">0</button><button class="pkey sm" data-cpk="del">⌫</button></div>'+
+      '</div>';
+    document.getElementById('cpx').onclick=function(){ov.remove();};
+    ov.querySelectorAll('[data-cpk]').forEach(function(el){
+      el.onclick=function(){
+        var k=el.dataset.cpk;
+        var v = step==='current'?cur:step==='next'?next:confirmPin;
+        if(k==='clr') v='';
+        else if(k==='del') v=v.slice(0,-1);
+        else if(v.length<4) v+=k;
+        if(step==='current') cur=v; else if(step==='next') next=v; else confirmPin=v;
+        draw();
+        if(v.length===4){
+          setTimeout(function(){
+            if(step==='current'){
+              if(cur===S.pin){ step='next'; draw(); }
+              else{ cur=''; draw(); toast('Incorrect current PIN','#EF4444'); }
+            }else if(step==='next'){
+              step='confirm'; draw();
+            }else{
+              if(confirmPin===next){
+                fbSavePin(next).then(function(){
+                  ov.remove(); toast('PIN updated ✓','#30D158');
+                });
+              }else{
+                next='';confirmPin='';step='next';draw();
+                toast('PINs did not match — try again','#EF4444');
+              }
+            }
+          },180);
+        }
+      };
+    });
+  }
+  draw();
+}
+
+function showPin(){
+  var pin='';
+  var ov=document.createElement('div');
+  ov.className='pin-overlay';
+  ov.innerHTML='<div class="pin-modal">'+
+    '<button class="pin-x" id="pinx">✕</button>'+
+    '<div style="font-size:40px;margin-bottom:10px">🔒</div>'+
+    '<div style="font-family:Barlow Condensed,sans-serif;font-size:24px;font-weight:800;color:var(--text);margin-bottom:4px">Parent View</div>'+
+    '<div style="font-size:13px;color:var(--muted)">Enter PIN to continue</div>'+
+    '<div class="pin-dots">'+[0,1,2,3].map(function(i){return '<div class="pdot" id="pd'+i+'"></div>';}).join('')+'</div>'+
+    '<div class="pin-grid">'+[1,2,3,4,5,6,7,8,9].map(function(n){return '<button class="pkey" data-pk="'+n+'">'+n+'</button>';}).join('')+
+      '<button class="pkey sm" data-pk="clr">CLR</button><button class="pkey" data-pk="0">0</button><button class="pkey sm" data-pk="del">⌫</button></div>'+
+    (S.pin==='1234'?'<div style="font-size:11px;color:var(--muted);margin-top:14px">Default PIN: 1234 — change it in Parent View → Change PIN</div>':'')+'</div>';
+
+  document.body.appendChild(ov);
+  function dots(){[0,1,2,3].forEach(function(i){var d=document.getElementById('pd'+i);if(d)d.className='pdot'+(i<pin.length?' on':'');});}
+  document.getElementById('pinx').onclick=function(){ov.remove();};
+  ov.querySelectorAll('[data-pk]').forEach(function(el){
+    el.onclick=function(){
+      var k=el.dataset.pk;
+      if(k==='clr'){pin='';dots();return;}
+      if(k==='del'){pin=pin.slice(0,-1);dots();return;}
+      if(pin.length>=4) return;
+      pin+=k;dots();
+      if(pin.length===4){
+        setTimeout(function(){
+          if(pin===S.pin){ov.remove();S.scr='pdash';render();}
+          else{pin='';dots();toast('Incorrect PIN','#EF4444');}
+        },180);
+      }
+    };
+  });
+}
+
+function showProfile(){
+  var ov=document.createElement('div');
+  ov.className='profile-overlay';
+  var done=S.habits.filter(function(h){return h.done;}).length;
+
+  var xpRows=[
+    ['🔑 Opening the app daily','+5 XP'],['✅ Checking off a habit','+5 XP'],
+    ['🎯 All habits done — bonus','+20 XP'],['📌 Daily goal task checked','+15 XP'],
+    ['📆 Weekly goal completed','+75 XP'],['📅 Monthly goal completed','+150 XP'],
+    ['🏆 Yearly goal completed','+500 XP'],['🔥 7-day streak milestone','+75 XP'],
+    ['💭 Writing a reflection','+25 XP']
+  ].map(function(r){return '<div class="xp-row"><div class="xp-action">'+r[0]+'</div><div class="xp-val">'+r[1]+'</div></div>';}).join('');
+
+  var lvlExp=[
+    ['#8E8E93','Amateur',"You're starting. Everyone starts here. The work begins the moment you decide."],
+    ['#4A90D9','Prospect',"You've shown up consistently. People are starting to notice something different about you."],
+    ['#30D158','Pro',"You've made discipline a habit. The work is starting to feel normal, not hard."],
+    ['#F59E0B','All-Star',"You're in rare company. Most people quit before they get here. You didn't."],
+    ['#C41E3A','MVP',"A full year of showing up. You're not the same person who started. Not even close."],
+    ['#C5A572','Legend',"Reserved for the ones who went all in all year. If you're here, you already know why."]
+  ].map(function(l){return '<div class="lvl-explain"><div class="lvl-dot" style="background:'+l[0]+'"></div><div class="lvl-name-e" style="color:'+l[0]+'">'+l[1]+'</div><div class="lvl-desc-e">'+l[2]+'</div></div>';}).join('');
+
+  var statExp=[
+    ['🔥 Streak',"Consecutive days where you completed all your habits. This one breaks easily — and that's the point. It keeps you honest."],
+    ['🏅 Personal Best Streak','Your longest streak ever. Once you set a record, you\'ve got something to beat. That number is yours — nobody else\'s.'],
+    ['⭐ Perfect Days','Days where you went all in — every habit checked. This number never goes down.'],
+    ['🚀 Season Pace',"Where you're tracking to land by year's end at your current rate."],
+    ['📅 Heat Map','Your whole season at a glance. Bright gold = big day. Empty = you didn\'t show up.'],
+    ['📝 Report Card','Honest grades per category based on your goal completion rate. Not what you intended to do. What you actually did.']
+  ].map(function(s){return '<div class="stat-explain"><div class="stat-name">'+s[0]+'</div><div class="stat-desc">'+s[1]+'</div></div>';}).join('');
+
+  var pbSections=[
+    ['s1','💡','Why This Works',
+      '<p>Most guys your age <strong>want</strong> things. Few actually <em>decide</em> to go get them. Wanting and deciding are not the same thing.</p>'+
+      '<p>Wanting is "I hope I make the top team." Deciding is "I\'m going to put in extra work today, even when I don\'t feel like it."</p>'+
+      '<p>The gap between who you are now and who you want to be is closed one small decision at a time. <em>A thousand small ones.</em></p>'+
+      '<p>That\'s what this app tracks. Not your talent. Your decisions.</p>'],
+    ['s2','⚡','How XP Works','<p>XP is proof you showed up. Every action earns a different amount based on how much it matters.</p><div style="margin-bottom:12px">'+xpRows+'</div><p>The math is simple. <em>Show up every day and the levels take care of themselves.</em></p>'],
+    ['s3','🏆','What Each Level Means','<p>Levels aren\'t just numbers. Each one represents something real about where you are in the work.</p><div>'+lvlExp+'</div>'],
+    ['s4','🎯','Goals vs Habits',
+      '<p><strong>Goals are where you\'re going.</strong> Outcomes you work toward over weeks, months, or a whole year.</p>'+
+      '<p><strong>Habits are how you get there.</strong> The daily actions that close the gap.</p>'+
+      '<p><em>You can\'t control whether you make the team. You can control whether you practice.</em></p>'+
+      '<p><strong>Repeating goals</strong> — like "practice 3x per week" — are goals that become habits.</p>'],
+    ['s5','📊','Your Stats Explained','<div>'+statExp+'</div>'],
+    ['s6','💪','Why Habits Compound',
+      '<p>Making your bed doesn\'t make you better at your sport. Not directly. But <em>it makes you someone who does what they said they\'d do.</em></p>'+
+      '<p>That identity transfers to everything else. <strong>They\'re building the person who can do the hard things.</strong></p>'+
+      '<p>The goals tell you where you\'re going. The habits build the version of you who can actually get there.</p>']
+  ].map(function(s){
+    return '<div class="pb-section"><div class="pb-sec-hd" data-psec="'+s[0]+'">'+
+      '<div class="pb-sec-ico">'+s[1]+'</div><div class="pb-sec-title">'+s[2]+'</div>'+
+      '<div class="pb-sec-arrow" id="parr-'+s[0]+'">›</div></div>'+
+      '<div class="pb-body" id="pbody-'+s[0]+'">'+s[3]+'</div></div>';
+  }).join('');
+
+  ov.innerHTML=
+    '<div class="profile-hdr"><button class="profile-close" id="pf-close">✕</button>'+
+      '<div class="profile-tabs">'+
+        '<div class="ptab on" data-ptab="identity">Identity</div>'+
+        '<div class="ptab" data-ptab="playbook">Playbook</div>'+
+        '<div class="ptab" data-ptab="settings">Settings</div>'+
+      '</div></div>'+
+    '<div class="scroll fin" id="pf-identity" style="padding-top:14px">'+
+      '<div class="id-hero"><div class="id-top"><div class="id-avatar">'+logo(64)+'</div>'+
+        '<div><div class="id-name">Nolan Prather</div><div class="id-level">⚡ Amateur</div></div></div>'+
+        '<div class="id-stats">'+
+          '<div class="id-stat"><div class="id-stat-n" style="color:#F59E0B">'+S.streak+'</div><div class="id-stat-l">Day streak</div></div>'+
+          '<div class="id-stat"><div class="id-stat-n" style="color:#C5A572">'+S.xp+'</div><div class="id-stat-l">Total XP</div></div>'+
+          '<div class="id-stat"><div class="id-stat-n" style="color:#30D158">12</div><div class="id-stat-l">Perfect days</div></div>'+
+        '</div></div>'+
+      '<div class="sec">Your Commitments</div>'+
+      '<div class="commit-card"><div class="commit-lbl" style="color:#C5A572">What you&rsquo;re working for</div>'+
+        '<div class="commit-q">What\'s one thing you want badly enough to actually work for?</div>'+
+        '<div class="commit-a">"Make the N1 team and earn real playing time."</div></div>'+
+      '<div class="commit-card"><div class="commit-lbl" style="color:#C41E3A">What&rsquo;s in the way</div>'+
+        '<div class="commit-q">What\'s standing between you and that?</div>'+
+        '<div class="commit-a">"I rely on talent and don\'t put in extra work outside of practice."</div></div>'+
+      '<div class="commit-card"><div class="commit-lbl" style="color:#9B72CF">Who you&rsquo;re becoming</div>'+
+        '<div class="commit-q">Who do you want to be by the end of this year?</div>'+
+        '<div class="commit-a">"The guy who does the work when no one is watching."</div></div>'+
+      '<div style="height:16px"></div><div style="font-size:11px;color:#5E5A72;text-align:center;line-height:1.6">Season 1 · Aug–Dec 2025<br>Started Aug 1, 2025</div>'+
+    '</div>'+
+    '<div class="scroll fin" id="pf-playbook" style="display:none;padding-top:14px">'+
+      '<div class="pb-intro"><strong>This is your Playbook.</strong> Not a manual. Not rules. Just the stuff that\'ll actually help you understand why this app exists and what it\'s trying to do for you. Read it when you\'re ready.</div>'+
+      pbSections+
+    '</div>'+
+    '<div class="scroll fin" id="pf-settings" style="display:none;padding-top:14px">'+
+      '<div class="sec">Display</div>'+
+      '<div class="toggle-row"><div class="settings-ico">🌙</div><div class="toggle-body">'+
+        '<div class="toggle-lbl">Dark Mode</div><div class="toggle-sub">Follows your phone\'s system setting</div></div>'+
+        '<div class="toggle-sw on" id="pf-theme-tog"></div></div>'+
+      '<div class="sec">Active Sports</div>'+
+      '<div class="season-card"><div style="font-family:Barlow Condensed,sans-serif;font-size:13px;font-weight:800;color:#4A90D9;margin-bottom:8px">⚽ Soccer is pinned year-round</div>'+
+        '<div style="font-size:12px;color:#9B97B0;margin-bottom:12px;line-height:1.5">Toggle your other sports based on what\'s in season. Only active sports show goals and earn XP.</div>'+
+        '<div class="sport-grid">'+
+          ['⚽ Soccer|on','⚾ Baseball|on','🏀 Basketball|off','🏃 Cross Country|off','🏃 Track|off','⛳ Golf|on']
+            .map(function(s){var p=s.split('|');return '<div class="sport-chip '+p[1]+'">'+p[0]+'</div>';}).join('')+
+        '</div></div>'+
+      '<div class="sec">Account</div>'+
+      '<div class="settings-row" id="pf-pin-row"><div class="settings-ico">🔒</div><div class="settings-body">'+
+        '<div class="settings-lbl">Parent PIN</div><div class="settings-sub">Change the PIN for parent access</div></div>'+
+        '<div class="settings-arrow">›</div></div>'+
+      '<div class="settings-row"><div class="settings-ico">🔔</div><div class="settings-body">'+
+        '<div class="settings-lbl">Notifications</div><div class="settings-sub">Manage what Matt & Jen get notified about</div></div>'+
+        '<div class="settings-arrow">›</div></div>'+
+    '</div>';
+
+  document.body.appendChild(ov);
+
+  ov.querySelectorAll('[data-ptab]').forEach(function(el){
+    el.onclick=function(){
+      ov.querySelectorAll('.ptab').forEach(function(p){p.classList.remove('on');});
+      el.classList.add('on');
+      var t=el.dataset.ptab;
+      document.getElementById('pf-identity').style.display=t==='identity'?'block':'none';
+      document.getElementById('pf-playbook').style.display=t==='playbook'?'block':'none';
+      document.getElementById('pf-settings').style.display=t==='settings'?'block':'none';
+    };
+  });
+  ov.querySelectorAll('[data-psec]').forEach(function(hd){
+    hd.onclick=function(){
+      var id=hd.dataset.psec;
+      var body=document.getElementById('pbody-'+id), arr=document.getElementById('parr-'+id);
+      var open=body.classList.contains('open');
+      body.classList.toggle('open',!open); body.style.display=open?'none':'block';
+      arr.classList.toggle('open',!open);
+    };
+  });
+  var tt=document.getElementById('pf-theme-tog'); if(tt) tt.onclick=function(){tt.classList.toggle('on');};
+  ov.querySelectorAll('.sport-chip').forEach(function(chip){
+    if(chip.textContent.trim().indexOf('Soccer')>-1) return; // pinned, not toggleable
+    chip.onclick=function(){chip.classList.toggle('on');chip.classList.toggle('off');};
+  });
+  var pinRow=document.getElementById('pf-pin-row'); if(pinRow) pinRow.onclick=function(){ov.remove();showPin();};
+  document.getElementById('pf-close').onclick=function(){ov.remove();};
+}
+
+function bind(){
+  var app=document.getElementById('app');
+  var vb=document.getElementById('vbtn');if(vb) vb.onclick=function(){S.tab='home';go('main');};
+  var lb=document.getElementById('lock-btn');if(lb) lb.onclick=showPin;
+  var lc=document.getElementById('lock-close');if(lc) lc.onclick=function(){S.tab='home';go('main');};
+  var cr=document.getElementById('copy-rpt');if(cr) cr.onclick=function(){toast('Report copied!','#C5A572');};
+  var cpb=document.getElementById('change-pin-btn');if(cpb) cpb.onclick=showChangePin;
+  var avb=document.getElementById('avatar-btn');if(avb) avb.onclick=showProfile;
+  var tb=document.getElementById('theme-btn');if(tb) tb.onclick=function(){toast('Light mode in the full build!','#C5A572');};
+
+  app.querySelectorAll('[data-tab]').forEach(function(el){el.onclick=function(){S.tab=el.dataset.tab;go('main');};});
+  app.querySelectorAll('[data-go]').forEach(function(el){el.onclick=function(){go(el.dataset.go);};});
+  app.querySelectorAll('[data-gtab]').forEach(function(el){el.onclick=function(){S.goalsTab=el.dataset.gtab;render();};});
+  app.querySelectorAll('[data-gtype]').forEach(function(el){el.onclick=function(){S.goalType=el.dataset.gtype;render();};});
+  app.querySelectorAll('[data-hor]').forEach(function(el){el.onclick=function(){S.hor=el.dataset.hor;S.picked=null;render();};});
+  app.querySelectorAll('[data-pick]').forEach(function(el){
+    el.onclick=function(){S.picked=el.dataset.pick;S.addedTitle=el.dataset.etxt||'';render();};
+  });
+  app.querySelectorAll('[data-editg]').forEach(function(el){
+    el.onclick=function(){toast('Full goal editing in the real build','#C5A572');};
+  });
+
+  app.querySelectorAll('[data-tog]').forEach(function(el){
+    el.onclick=function(){
+      var id=el.dataset.tog;
+      var h=S.habits.find(function(x){return x.id===id;});
+      if(!h) return;
+      h.done=!h.done;
+      if(h.done){
+        S.xp+=5;
+        toast('+5 XP · '+h.lbl,h.clr);
+        if(S.habits.every(function(x){return x.done;})){
+          setTimeout(function(){S.xp+=20;toast('🎉 All missions done! +20 XP','#30D158');},1900);
+        }
+      }
+      var xb=document.getElementById('xpbar');var xn=document.getElementById('xpnums');
+      if(xb) xb.style.width=Math.round(S.xp/S.xpMax*100)+'%';
+      if(xn) xn.textContent=S.xp+' / '+S.xpMax+' XP';
+      var box=el.querySelector('.chk-box');var lbl=el.querySelector('.row-lbl');
+      if(box){box.textContent=h.done?'✓':'';box.style.background=h.done?h.clr:'';box.style.borderColor=h.done?h.clr:'rgba(255,255,255,.1)';box.className='chk-box'+(h.done?' done':'');}
+      if(lbl) lbl.className='row-lbl'+(h.done?' done':'');
+      fbSaveState(); // FIREBASE: persist + sync to parent views
+    };
+  });
+
+  var fu=document.getElementById('fup');var fd=document.getElementById('fdown');var fn=document.getElementById('freqn');
+  if(fu) fu.onclick=function(){if(S.freqN<7){S.freqN++;if(fn)fn.textContent=S.freqN;}};
+  if(fd) fd.onclick=function(){if(S.freqN>1){S.freqN--;if(fn)fn.textContent=S.freqN;}};
+
+  var cg=document.getElementById('custgoal');
+  if(cg) cg.addEventListener('input',function(){
+    S.addedTitle=cg.value;if(cg.value.trim()) S.picked=null;
+    var sb=document.getElementById('saveg');
+    if(sb){var ok=!!(S.picked||cg.value.trim().length>2);sb.className='btn btn-red'+(ok?'':' dim');sb.textContent=ok?'Save This Goal':'Select a suggestion or write your own';}
+  });
+
+  var sg=document.getElementById('saveg');
+  if(sg) sg.onclick=function(){
+    var t=S.addedTitle||(cg?cg.value:'');
+    if(!t.trim()) return;
+    S.addedGoal={id:'gnew',t:t.trim(),pct:0,done:false,hor:cap(S.hor)};
+    S.goalAdded=true;toast('Goal added! 💪','#C41E3A');go('ath');
+    fbSaveState(); // FIREBASE: persist + sync to parent views
+  };
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
+
+render();
+fetchDailyVerse();
+fbInit();
+
+// PWA service worker (offline shell caching + install-to-homescreen)
+if('serviceWorker' in navigator){
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('sw.js').catch(function(e){console.warn('SW registration failed',e);});
+  });
+}
+</script>
+</body>
+</html>
