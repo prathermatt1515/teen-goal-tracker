@@ -640,7 +640,7 @@ function fbLoadState(){
     if(snap.exists){
       var d=snap.data();
       // Merge saved fields onto defaults without clobbering local-only UI state (scr/tab/etc.)
-      ['streak','xp','xpMax','habits','goals','dayHabits','identity'].forEach(function(k){
+      ['streak','xp','xpMax','habits','goals','dayHabits','identity','activeSports'].forEach(function(k){
         if(d[k]!==undefined) S[k]=d[k];
       });
       render();
@@ -662,7 +662,7 @@ function fbListenState(){
   db.doc(window.APP_CONFIG.docIds.nolanState).onSnapshot(function(snap){
     if(!snap.exists) return;
     var d=snap.data();
-    ['streak','xp','xpMax','habits','goals','dayHabits','identity'].forEach(function(k){
+    ['streak','xp','xpMax','habits','goals','dayHabits','identity','activeSports'].forEach(function(k){
       if(d[k]!==undefined) S[k]=d[k];
     });
     if(S.scr==='main') render();
@@ -674,7 +674,7 @@ function fbSaveState(){
   clearTimeout(saveTimer);
   saveTimer=setTimeout(function(){
     db.doc(window.APP_CONFIG.docIds.nolanState).set({
-      streak:S.streak, xp:S.xp, xpMax:S.xpMax, habits:S.habits, goals:S.goals, dayHabits:S.dayHabits, identity:S.identity,
+      streak:S.streak, xp:S.xp, xpMax:S.xpMax, habits:S.habits, goals:S.goals, dayHabits:S.dayHabits, identity:S.identity, activeSports:S.activeSports,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     },{merge:true}).catch(function(e){console.error('Save state failed',e);});
   },400); // debounce so rapid taps don't spam writes
@@ -790,6 +790,8 @@ var S={
   scr:'verse',tab:'home',goalsTab:'cat',curCat:'athletics',theme:getInitialTheme(),
   goalType:'once',freqN:3,hor:'yearly',picked:null,addedTitle:'',linkParent:null,
   identity:{goal:'',obstacle:'',becoming:''},
+  activeSports:{soccer:true,baseball:true,basketball:false,crosscountry:false,track:false,golf:true},
+  curSport:'soccer',
   pin:'1234',
   verse:{text:'I can do all things through Christ who strengthens me.', ref:'Philippians 4:13 · NIV'},
   streak:7,xp:340,xpMax:3000,
@@ -815,9 +817,9 @@ var S={
     {id:'g5',t:'Tackle the assignment you have been avoiding',pct:0,done:false,hor:'Monthly',cat:'academics',parentId:'g4'},
     {id:'g6',t:'Start homework before dinner every day this week',pct:60,done:false,hor:'Weekly',cat:'academics',parentId:'g5'},
     // Athletics — in progress
-    {id:'g7',t:'Make the N1 team',                     pct:0,done:false,hor:'Yearly', cat:'athletics',parentId:null},
-    {id:'g8',t:'Improve first touch',                  pct:0,done:false,hor:'Monthly',cat:'athletics',parentId:'g7'},
-    {id:'g9',t:'Get extra reps outside of practice this week',pct:40,done:false,hor:'Weekly',cat:'athletics',parentId:'g8'},
+    {id:'g7',t:'Make the N1 team',                     pct:0,done:false,hor:'Yearly', cat:'athletics',parentId:null,sport:'soccer'},
+    {id:'g8',t:'Improve first touch',                  pct:0,done:false,hor:'Monthly',cat:'athletics',parentId:'g7',sport:'soccer'},
+    {id:'g9',t:'Get extra reps outside of practice this week',pct:40,done:false,hor:'Weekly',cat:'athletics',parentId:'g8',sport:'soccer'},
     // Creative — in progress
     {id:'g10',t:'Earn first chair by the end of the year',pct:0,done:false,hor:'Yearly', cat:'creative',parentId:null},
     {id:'g11',t:'Learn a new song for the fall concert',pct:0,done:false,hor:'Monthly',cat:'creative',parentId:'g10'},
@@ -966,6 +968,15 @@ function goalIsDone(g){
   return kids.every(function(k){return goalIsDone(k);});
 }
 
+var SPORTS=[
+  {key:'soccer',l:'⚽ Soccer',pinned:true},
+  {key:'baseball',l:'⚾ Baseball'},
+  {key:'basketball',l:'🏀 Basketball'},
+  {key:'crosscountry',l:'🏃 Cross Country'},
+  {key:'track',l:'🏃 Track'},
+  {key:'golf',l:'⛳ Golf'}
+];
+
 var CATS={
   faith:    {l:'Faith',    ico:'✝️', clr:'#C5A572', glow:'rgba(197,165,114,0.28)', brd:'rgba(197,165,114,0.35)'},
   academics:{l:'Academics',ico:'📚', clr:'#4A90D9',  glow:'rgba(74,144,217,0.28)',  brd:'rgba(74,144,217,0.35)'},
@@ -1080,7 +1091,14 @@ function sGoals(){
 function sCatDetail(){
   var key=S.curCat||'athletics';
   var c=CATS[key];
-  var goals=S.goals.filter(function(g){return g.cat===key;});
+  var isAthletics=key==='athletics';
+  var activeSportList=SPORTS.filter(function(s){return s.pinned||S.activeSports[s.key];});
+  if(isAthletics && !S.activeSports[S.curSport]) S.curSport='soccer';
+  var goals=S.goals.filter(function(g){
+    if(g.cat!==key) return false;
+    if(isAthletics) return (g.sport||'soccer')===S.curSport;
+    return true;
+  });
   var done=goals.filter(function(g){return goalIsDone(g);}).length;
 
   function gcard(g,depth){
@@ -1103,11 +1121,11 @@ function sCatDetail(){
   yearly.forEach(function(y){
     tree+=gcard(y,0);
     linkedIds[y.id]=true;
-    var months=goalChildren(y.id).filter(function(g){return g.cat===key;});
+    var months=goalChildren(y.id).filter(function(g){return g.cat===key && (!isAthletics||(g.sport||'soccer')===S.curSport);});
     months.forEach(function(m){
       tree+=gcard(m,1);
       linkedIds[m.id]=true;
-      var weeks=goalChildren(m.id).filter(function(g){return g.cat===key;});
+      var weeks=goalChildren(m.id).filter(function(g){return g.cat===key && (!isAthletics||(g.sport||'soccer')===S.curSport);});
       weeks.forEach(function(w){
         tree+=gcard(w,2);
         linkedIds[w.id]=true;
@@ -1127,9 +1145,10 @@ function sCatDetail(){
   }[key];
 
   var sportTabs='';
-  if(key==='athletics'){
-    var sports=[{l:'⚽ Soccer',on:true},{l:'⚾ Baseball',on:false},{l:'🏀 Ball',on:false},{l:'⛳ Golf',on:false}];
-    sportTabs='<div class="sport-tabs">'+sports.map(function(s){return '<div class="s-tab '+(s.on?'on':'off')+'">'+s.l+'</div>';}).join('')+'</div>';
+  if(isAthletics){
+    sportTabs='<div class="sport-tabs">'+activeSportList.map(function(s){
+      return '<div class="s-tab '+(s.key===S.curSport?'on':'off')+'" data-sporttab="'+s.key+'">'+s.l+'</div>';
+    }).join('')+'</div>';
   }
 
   return '<div style="display:flex;flex-direction:column;height:100%">'+
@@ -1145,7 +1164,7 @@ function sCatDetail(){
         '</div>'+
       '</div>'+
       sportTabs+glist+
-      '<div class="add-btn" data-go="addg">+ Add '+c.l+' Goal</div>'+
+      '<div class="add-btn" data-go="addg">+ Add '+(isAthletics?activeSportList.find(function(s){return s.key===S.curSport;}).l.replace(/^\S+\s/,''):c.l)+' Goal</div>'+
     '</div>'+nav()+'</div>';
 }
 
@@ -1902,8 +1921,10 @@ function showProfile(){
       '<div class="season-card"><div style="font-family:Barlow Condensed,sans-serif;font-size:13px;font-weight:800;color:#4A90D9;margin-bottom:8px">⚽ Soccer is pinned year-round</div>'+
         '<div style="font-size:12px;color:#9B97B0;margin-bottom:12px;line-height:1.5">Toggle your other sports based on what\'s in season. Only active sports show goals and earn XP.</div>'+
         '<div class="sport-grid">'+
-          ['⚽ Soccer|on','⚾ Baseball|on','🏀 Basketball|off','🏃 Cross Country|off','🏃 Track|off','⛳ Golf|on']
-            .map(function(s){var p=s.split('|');return '<div class="sport-chip '+p[1]+'">'+p[0]+'</div>';}).join('')+
+          SPORTS.map(function(s){
+            var active=s.pinned||S.activeSports[s.key];
+            return '<div class="sport-chip '+(active?'on':'off')+'" data-sporttoggle="'+s.key+'" style="'+(s.pinned?'opacity:.7;cursor:default':'')+'">'+s.l+'</div>';
+          }).join('')+
         '</div></div>'+
       '<div class="sec">Account</div>'+
       '<div class="settings-row" id="pf-pin-row"><div class="settings-ico">🔒</div><div class="settings-body">'+
@@ -1936,9 +1957,14 @@ function showProfile(){
     };
   });
   var tt=document.getElementById('pf-theme-tog'); if(tt) tt.onclick=toggleTheme;
-  ov.querySelectorAll('.sport-chip').forEach(function(chip){
-    if(chip.textContent.trim().indexOf('Soccer')>-1) return; // pinned, not toggleable
-    chip.onclick=function(){chip.classList.toggle('on');chip.classList.toggle('off');};
+  ov.querySelectorAll('[data-sporttoggle]').forEach(function(chip){
+    var key=chip.dataset.sporttoggle;
+    if(SPORTS.find(function(s){return s.key===key;}).pinned) return; // pinned, not toggleable
+    chip.onclick=function(){
+      S.activeSports[key]=!S.activeSports[key];
+      chip.classList.toggle('on');chip.classList.toggle('off');
+      fbSaveState();
+    };
   });
   var pinRow=document.getElementById('pf-pin-row'); if(pinRow) pinRow.onclick=function(){ov.remove();showPin();};
   var idBtn=document.getElementById('setup-identity-btn'); if(idBtn) idBtn.onclick=function(){ov.remove();showIdentityForm();};
@@ -1961,6 +1987,7 @@ function bind(){
   app.querySelectorAll('[data-gtype]').forEach(function(el){el.onclick=function(){S.goalType=el.dataset.gtype;render();};});
   app.querySelectorAll('[data-hor]').forEach(function(el){el.onclick=function(){S.hor=el.dataset.hor;S.picked=null;S.linkParent=null;render();};});
   app.querySelectorAll('[data-linkparent]').forEach(function(el){el.onclick=function(){S.linkParent=el.dataset.linkparent==='none'?null:el.dataset.linkparent;render();};});
+  app.querySelectorAll('[data-sporttab]').forEach(function(el){el.onclick=function(){S.curSport=el.dataset.sporttab;render();};});
   app.querySelectorAll('[data-pick]').forEach(function(el){
     el.onclick=function(){S.picked=el.dataset.pick;S.addedTitle=el.dataset.etxt||'';render();};
   });
@@ -2016,7 +2043,7 @@ function bind(){
   if(sg) sg.onclick=function(){
     var t=S.addedTitle||(cg?cg.value:'');
     if(!t.trim()) return;
-    S.goals.push({id:'g'+Date.now(),t:t.trim(),pct:0,done:false,hor:cap(S.hor),cat:S.curCat,parentId:S.linkParent||null});
+    S.goals.push({id:'g'+Date.now(),t:t.trim(),pct:0,done:false,hor:cap(S.hor),cat:S.curCat,parentId:S.linkParent||null,sport:S.curCat==='athletics'?S.curSport:undefined});
     toast('Goal added! 💪','#C41E3A');
     S.picked=null;S.addedTitle='';
     go('catdetail');
