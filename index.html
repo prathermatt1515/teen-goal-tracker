@@ -734,8 +734,8 @@ function setupPush(parentDocId){
 }
 
 var S={
-  scr:'verse',tab:'home',goalsTab:'cat',
-  goalType:'once',freqN:3,hor:'yearly',picked:null,addedTitle:'',goalAdded:false,addedGoal:null,
+  scr:'verse',tab:'home',goalsTab:'cat',curCat:'athletics',
+  goalType:'once',freqN:3,hor:'yearly',picked:null,addedTitle:'',
   pin:'1234',
   verse:{text:'I can do all things through Christ who strengthens me.', ref:'Philippians 4:13 · NIV'},
   streak:7,xp:340,xpMax:3000,
@@ -748,16 +748,15 @@ var S={
     {id:'h6',lbl:'Practice my part',      cat:'Band',  clr:'#9B72CF',done:false},
   ],
   goals:[
-    {id:'g1',t:'Make the N1 team',            pct:60, done:false,hor:'Yearly'},
-    {id:'g2',t:'Improve first touch',          pct:20, done:false,hor:'Monthly'},
-    {id:'g3',t:'Attend all summer practices',  pct:100,done:true, hor:'Monthly'},
+    {id:'g1',t:'Make the N1 team',            pct:60, done:false,hor:'Yearly', cat:'athletics'},
+    {id:'g2',t:'Improve first touch',          pct:20, done:false,hor:'Monthly',cat:'athletics'},
+    {id:'g3',t:'Attend all summer practices',  pct:100,done:true, hor:'Monthly',cat:'athletics'},
+    {id:'g4',t:'Read through the book of John',pct:50, done:false,hor:'Monthly',cat:'faith'},
+    {id:'g5',t:'Memorize a verse a week',       pct:100,done:true, hor:'Weekly', cat:'faith'},
+    {id:'g6',t:'Bring my grade up in math',     pct:0,  done:false,hor:'Monthly',cat:'academics'},
+    {id:'g7',t:'Read 20 pages a week',          pct:66, done:false,hor:'Weekly', cat:'academics'},
+    {id:'g8',t:'Learn a new song for the fall concert',pct:75,done:false,hor:'Monthly',cat:'creative'},
   ],
-};
-
-var EXAMPLES={
-  yearly:['Earn your spot at the next competitive level','Set a performance goal for this season','Become the hardest worker on your team','Build something you are proud of by December'],
-  monthly:['Improve your weakest skill this month','Add something new to your game','Be more consistent in training','Tackle the thing you have been avoiding'],
-  weekly:['Get extra reps outside of practice this week','Study the game — watch film','Give everything in every session this week','Do one thing today your future self will thank you for'],
 };
 
 function go(scr){S.scr=scr;render();}
@@ -775,7 +774,7 @@ function render(){
   var h='';
   if(S.scr==='verse')   h=sVerse();
   else if(S.scr==='main')  h=sMain();
-  else if(S.scr==='ath')   h=sAth();
+  else if(S.scr==='catdetail') h=sCatDetail();
   else if(S.scr==='addg')  h=sAddGoal();
   else if(S.scr==='pdash') h=sParentDash();
   app.innerHTML=h;
@@ -876,20 +875,49 @@ function sHome(){
   '</div>';
 }
 
+var CATS={
+  faith:    {l:'Faith',    ico:'✝️', clr:'#C5A572', glow:'rgba(197,165,114,0.28)', brd:'rgba(197,165,114,0.35)'},
+  academics:{l:'Academics',ico:'📚', clr:'#4A90D9',  glow:'rgba(74,144,217,0.28)',  brd:'rgba(74,144,217,0.35)'},
+  athletics:{l:'Athletics',ico:'🏆', clr:'#C41E3A',  glow:'rgba(196,30,58,0.28)',   brd:'rgba(196,30,58,0.35)'},
+  creative: {l:'Creative', ico:'🎵', clr:'#9B72CF',  glow:'rgba(155,114,207,0.28)', brd:'rgba(155,114,207,0.35)'},
+};
+
+var EXAMPLES_BY_CAT={
+  athletics:{
+    yearly:['Earn your spot at the next competitive level','Set a performance goal for this season','Become the hardest worker on your team','Build something you are proud of by December'],
+    monthly:['Improve your weakest skill this month','Add something new to your game','Be more consistent in training','Tackle the thing you have been avoiding'],
+    weekly:['Get extra reps outside of practice this week','Study the game — watch film','Give everything in every session this week','Do one thing today your future self will thank you for'],
+  },
+  faith:{
+    yearly:['Read through the whole Bible this year','Make your confirmation year count','Grow a habit of daily prayer','Serve somewhere outside your comfort zone'],
+    monthly:['Read through one book of the Bible','Memorize a verse a week this month','Find a way to serve someone this month','Have one honest conversation about your faith'],
+    weekly:['Pray before every meal this week','Read your Bible before you pick up your phone','Encourage a teammate or friend this week','Sit with one hard question instead of rushing past it'],
+  },
+  academics:{
+    yearly:['Set a grade target worth working for','Build a study habit that actually sticks','Read for fun, not just for class','Get ahead in the class you dread most'],
+    monthly:['Tackle the assignment you have been avoiding','Raise your lowest grade this month','Study a little every day instead of cramming','Ask for help before you fall behind'],
+    weekly:['Start homework before dinner every day this week','Review notes the same day you take them','Read for 20 minutes outside of assignments','Fix one bad study habit this week'],
+  },
+  creative:{
+    yearly:['Learn a piece that actually challenges you','Try out for something that scares you a little','Get first chair or your personal best','Create something you are proud to show people'],
+    monthly:['Learn a new song for the next concert','Practice the part you keep avoiding','Record yourself and listen back honestly','Try a style of music you have not played before'],
+    weekly:['Practice your part every day this week','Warm up properly before every practice','Run the hard section slow before fast','Practice with the recording, not just alone'],
+  },
+};
+
 function sGoals(){
-  var cats=[
-    {l:'Faith',    ico:'✝️', clr:'#C5A572',sub:'1 of 2 complete',pct:50,
-     glow:'rgba(197,165,114,0.28)',brd:'rgba(197,165,114,0.35)'},
-    {l:'Academics',ico:'📚', clr:'#4A90D9',sub:'0 of 3 complete',pct:0,
-     glow:'rgba(74,144,217,0.28)',brd:'rgba(74,144,217,0.35)'},
-    {l:'Athletics',ico:'🏆', clr:'#C41E3A',sub:'⚽ Soccer active',pct:30,
-     glow:'rgba(196,30,58,0.28)',brd:'rgba(196,30,58,0.35)'},
-    {l:'Creative', ico:'🎵', clr:'#9B72CF',sub:'First chair 🎺', pct:75,
-     glow:'rgba(155,114,207,0.28)',brd:'rgba(155,114,207,0.35)'},
-  ];
+  var catKeys=['faith','academics','athletics','creative'];
+  var cats=catKeys.map(function(key){
+    var c=CATS[key];
+    var catGoals=S.goals.filter(function(g){return g.cat===key;});
+    var done=catGoals.filter(function(g){return g.done;}).length;
+    var pct=catGoals.length?Math.round(done/catGoals.length*100):0;
+    var sub=key==='athletics'?'⚽ Soccer active':done+' of '+catGoals.length+' complete';
+    return {key:key,l:c.l,ico:c.ico,clr:c.clr,glow:c.glow,brd:c.brd,sub:sub,pct:pct};
+  });
 
   var grid=cats.map(function(c){
-    return '<div class="cat-card" style="--ac:'+c.clr+';--ac-glow:'+c.glow+';--ac-border:'+c.brd+'" data-go="ath">'+
+    return '<div class="cat-card" style="--ac:'+c.clr+';--ac-glow:'+c.glow+';--ac-border:'+c.brd+'" data-go="catdetail" data-cat="'+c.key+'">'+
       '<div class="cat-card-inner">'+
         '<span class="cat-icon">'+c.ico+'</span>'+
         '<div class="cat-lbl">'+c.l+'</div>'+
@@ -950,16 +978,15 @@ function sGoals(){
     '</div>';
 }
 
-function sAth(){
-  var sports=[{l:'⚽ Soccer',on:true},{l:'⚾ Baseball',on:false},{l:'🏀 Ball',on:false},{l:'⛳ Golf',on:false}];
-  var tabs=sports.map(function(s){return '<div class="s-tab '+(s.on?'on':'off')+'">'+s.l+'</div>';}).join('');
-  var goals=[...S.goals];
-  if(S.goalAdded&&S.addedGoal) goals.push(S.addedGoal);
+function sCatDetail(){
+  var key=S.curCat||'athletics';
+  var c=CATS[key];
+  var goals=S.goals.filter(function(g){return g.cat===key;});
   var done=goals.filter(function(g){return g.done;}).length;
   var glist=goals.map(function(g,i){
     return '<div class="g-card" data-editg="'+i+'">'+
-      '<div class="g-dot'+(g.done?' done':'')+'")></div>'+
-      '<div style="flex:1"><div class="g-title'+(g.done?' done':'')+'")>'+esc(g.t)+'</div>'+
+      '<div class="g-dot'+(g.done?' done':'')+'"></div>'+
+      '<div style="flex:1"><div class="g-title'+(g.done?' done':'')+'">'+esc(g.t)+'</div>'+
         (g.done?'<div class="g-meta">Completed ✓</div>':
           '<div class="g-hor">'+g.hor+'</div>'+
           '<div class="g-pbar"><div class="g-pfill" style="width:'+g.pct+'%"></div></div>'+
@@ -967,20 +994,33 @@ function sAth(){
       '</div><span class="g-chev">›</span></div>';
   }).join('');
 
+  var subLine={
+    athletics:'Performance, skills, and training goals',
+    faith:'Prayer, scripture, and character goals',
+    academics:'Grades, study habits, and schoolwork goals',
+    creative:'Practice, performance, and creative goals'
+  }[key];
+
+  var sportTabs='';
+  if(key==='athletics'){
+    var sports=[{l:'⚽ Soccer',on:true},{l:'⚾ Baseball',on:false},{l:'🏀 Ball',on:false},{l:'⛳ Golf',on:false}];
+    sportTabs='<div class="sport-tabs">'+sports.map(function(s){return '<div class="s-tab '+(s.on?'on':'off')+'">'+s.l+'</div>';}).join('')+'</div>';
+  }
+
   return '<div style="display:flex;flex-direction:column;height:100%">'+
     '<div class="topbar"><button class="back" data-tab="goals">‹ Goals</button>'+
-      '<span class="tbar-title" style="color:#C41E3A">🏆 Athletics</span>'+logo(32)+'</div>'+
+      '<span class="tbar-title" style="color:'+c.clr+'">'+c.ico+' '+c.l+'</span>'+logo(32)+'</div>'+
     '<div class="scroll fin">'+
       '<div class="hero-sec">'+
-        '<div class="hero-sub">Performance, skills, and training goals</div>'+
+        '<div class="hero-sub">'+subLine+'</div>'+
         '<div style="display:flex;gap:14px;align-items:baseline">'+
           '<div><span style="font-family:Barlow Condensed,sans-serif;font-size:26px;font-weight:800;color:var(--text)">'+done+'</span><span style="font-size:10px;color:var(--muted);margin-left:3px">complete</span></div>'+
           '<div><span style="font-family:Barlow Condensed,sans-serif;font-size:26px;font-weight:800;color:var(--text)">'+(goals.length-done)+'</span><span style="font-size:10px;color:var(--muted);margin-left:3px">in progress</span></div>'+
-          '<div style="font-family:Barlow Condensed,sans-serif;font-size:22px;font-weight:800;color:#C41E3A">'+Math.round(done/goals.length*100)+'%</div>'+
+          '<div style="font-family:Barlow Condensed,sans-serif;font-size:22px;font-weight:800;color:'+c.clr+'">'+(goals.length?Math.round(done/goals.length*100):0)+'%</div>'+
         '</div>'+
       '</div>'+
-      '<div class="sport-tabs">'+tabs+'</div>'+glist+
-      '<div class="add-btn" data-go="addg">+ Add Soccer Goal</div>'+
+      sportTabs+glist+
+      '<div class="add-btn" data-go="addg" style="border-color:'+c.clr+'">+ Add '+c.l+' Goal</div>'+
     '</div>'+nav()+'</div>';
 }
 
@@ -1161,7 +1201,8 @@ function sAddGoal(){
   var isFreq=S.goalType==='freq';
   var hors=['yearly','monthly','weekly'];
   var hbtns=hors.map(function(h){return '<button class="h-btn'+(S.hor===h?' on':'')+'" data-hor="'+h+'">'+cap(h)+'</button>';}).join('');
-  var exs=(EXAMPLES[S.hor]||[]).map(function(e,i){
+  var c=CATS[S.curCat]||CATS.athletics;
+  var exs=((EXAMPLES_BY_CAT[S.curCat]||EXAMPLES_BY_CAT.athletics)[S.hor]||[]).map(function(e,i){
     var id='e'+i;var sel=S.picked===id;
     return '<div class="ex-item'+(sel?' on':'')+'" data-pick="'+id+'" data-etxt="'+esc(e)+'">'+
       '<div class="ex-txt">'+e+'</div><div class="ex-add"></div></div>';
@@ -1169,7 +1210,7 @@ function sAddGoal(){
   var ready=!!(S.picked||(S.addedTitle&&S.addedTitle.trim().length>2));
 
   return '<div style="display:flex;flex-direction:column;height:100%">'+
-    '<div class="topbar"><button class="back" data-go="ath">‹ Athletics</button><span class="tbar-title">Add Goal</span>'+logo(32)+'</div>'+
+    '<div class="topbar"><button class="back" data-go="catdetail">‹ '+c.l+'</button><span class="tbar-title">Add Goal</span>'+logo(32)+'</div>'+
     '<div class="scroll fin">'+
       '<div class="form-lbl">Goal Type</div>'+
       '<div class="gtype-row">'+
@@ -1193,14 +1234,21 @@ function sAddGoal(){
 
 function sParentDash(){
   var done=S.habits.filter(function(h){return h.done;}).length;
-  var glist=S.goals.map(function(g){
-    return '<div class="p-row'+(g.done?' done':'')+'")><span>'+(g.done?'✅':'⬜')+'</span>'+
-      '<span style="flex:1;'+(g.done?'text-decoration:line-through':'')+'">'+esc(g.t)+'</span>'+
-      (g.pct&&!g.done?'<span style="font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:800;color:#C41E3A">'+g.pct+'%</span>':'')+
-    '</div>';
+  var catSections=['faith','academics','athletics','creative'].map(function(key){
+    var c=CATS[key];
+    var cg=S.goals.filter(function(g){return g.cat===key;});
+    if(!cg.length) return '';
+    var glist=cg.map(function(g){
+      return '<div class="p-row'+(g.done?' done':'')+'"><span>'+(g.done?'✅':'⬜')+'</span>'+
+        '<span style="flex:1;'+(g.done?'text-decoration:line-through':'')+'">'+esc(g.t)+'</span>'+
+        (g.pct&&!g.done?'<span style="font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:800;color:'+c.clr+'">'+g.pct+'%</span>':'')+
+      '</div>';
+    }).join('');
+    return '<div class="p-sec"><div class="p-hd" style="color:'+c.clr+'">'+c.ico+' '+c.l+' Goals</div>'+
+      '<div class="stat-box" style="padding:0 14px 4px">'+glist+'</div></div>';
   }).join('');
   var hlist=S.habits.map(function(h){
-    return '<div class="p-row'+(h.done?' done':'')+'")><span>'+(h.done?'✅':'⬜')+'</span><span>'+esc(h.lbl)+'</span></div>';
+    return '<div class="p-row'+(h.done?' done':'')+'"><span>'+(h.done?'✅':'⬜')+'</span><span>'+esc(h.lbl)+'</span></div>';
   }).join('');
 
   return '<div style="display:flex;flex-direction:column;height:100%">'+
@@ -1212,8 +1260,7 @@ function sParentDash(){
         '<div class="p-pill" style="background:rgba(74,144,217,.1);border:1px solid rgba(74,144,217,.2);color:#4A90D9">📊 78% habits this week</div>'+
         '<div class="p-pill" style="background:rgba(197,165,114,.1);border:1px solid rgba(197,165,114,.2);color:#C5A572">⚡ Amateur · '+S.xp+' XP</div>'+
       '</div>'+
-      '<div class="p-sec"><div class="p-hd" style="color:#C41E3A">🏆 Athletics Goals</div>'+
-        '<div class="stat-box" style="padding:0 14px 4px">'+glist+'</div></div>'+
+      catSections+
       '<div class="p-sec"><div class="p-hd" style="color:#F59E0B">⚡ Today&rsquo;s Habits &mdash; '+done+'/'+S.habits.length+'</div>'+
         '<div class="stat-box" style="padding:0 14px 4px">'+hlist+'</div></div>'+
       '<button class="btn btn-ghost" id="copy-rpt">📋 Copy Report</button>'+
@@ -1458,7 +1505,7 @@ function bind(){
   var tb=document.getElementById('theme-btn');if(tb) tb.onclick=function(){toast('Light mode in the full build!','#C5A572');};
 
   app.querySelectorAll('[data-tab]').forEach(function(el){el.onclick=function(){S.tab=el.dataset.tab;go('main');};});
-  app.querySelectorAll('[data-go]').forEach(function(el){el.onclick=function(){go(el.dataset.go);};});
+  app.querySelectorAll('[data-go]').forEach(function(el){el.onclick=function(){if(el.dataset.cat) S.curCat=el.dataset.cat;go(el.dataset.go);};});
   app.querySelectorAll('[data-gtab]').forEach(function(el){el.onclick=function(){S.goalsTab=el.dataset.gtab;render();};});
   app.querySelectorAll('[data-gtype]').forEach(function(el){el.onclick=function(){S.goalType=el.dataset.gtype;render();};});
   app.querySelectorAll('[data-hor]').forEach(function(el){el.onclick=function(){S.hor=el.dataset.hor;S.picked=null;render();};});
@@ -1507,8 +1554,10 @@ function bind(){
   if(sg) sg.onclick=function(){
     var t=S.addedTitle||(cg?cg.value:'');
     if(!t.trim()) return;
-    S.addedGoal={id:'gnew',t:t.trim(),pct:0,done:false,hor:cap(S.hor)};
-    S.goalAdded=true;toast('Goal added! 💪','#C41E3A');go('ath');
+    S.goals.push({id:'g'+Date.now(),t:t.trim(),pct:0,done:false,hor:cap(S.hor),cat:S.curCat});
+    toast('Goal added! 💪','#C41E3A');
+    S.picked=null;S.addedTitle='';
+    go('catdetail');
     fbSaveState(); // FIREBASE: persist + sync to parent views
   };
 }
