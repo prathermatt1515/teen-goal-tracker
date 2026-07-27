@@ -18,6 +18,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+svg{display:block;}
 html,body{height:100%;font-family:'Inter',-apple-system,sans-serif;
   -webkit-font-smoothing:antialiased;overflow:hidden;}
 
@@ -91,6 +92,7 @@ html[data-theme="light"] .verse-screen{background:#16141E !important;} /* verse 
   padding:env(safe-area-inset-top,44px) 14px 12px;flex-shrink:0;}
 .avatar{width:52px;height:52px;border-radius:16px;overflow:hidden;
   border:2px solid var(--gold);flex-shrink:0;}
+.avatar svg{display:block;width:100%;height:100%;}
 .hdr-info{flex:1;}
 .hdr-name{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;
   color:var(--text);line-height:1;letter-spacing:.02em;}
@@ -395,6 +397,7 @@ html[data-theme="light"] .verse-screen{background:#16141E !important;} /* verse 
   border:1.5px solid rgba(197,165,114,.28);border-radius:var(--r);padding:20px;margin-bottom:12px;}
 .id-top{display:flex;align-items:center;gap:14px;margin-bottom:16px;}
 .id-avatar{width:64px;height:64px;border-radius:20px;overflow:hidden;border:2px solid var(--gold);flex-shrink:0;}
+.id-avatar svg{display:block;width:100%;height:100%;}
 .id-name{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:800;color:var(--text);line-height:1;}
 .id-level{display:inline-block;background:linear-gradient(135deg,var(--gold),#D4B87A);color:#16141E;
   font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;letter-spacing:.06em;
