@@ -91,7 +91,7 @@ html[data-theme="light"] .verse-screen{background:#16141E !important;} /* verse 
 .game-hdr{display:flex;align-items:center;gap:10px;
   padding:env(safe-area-inset-top,44px) 14px 12px;flex-shrink:0;}
 .avatar{width:52px;height:52px;border-radius:16px;overflow:hidden;
-  border:2px solid var(--gold);flex-shrink:0;}
+  border:2px solid var(--gold);flex-shrink:0;padding:4px;}
 .avatar svg{display:block;width:100%;height:100%;}
 .hdr-info{flex:1;}
 .hdr-name{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;
@@ -396,7 +396,7 @@ html[data-theme="light"] .verse-screen{background:#16141E !important;} /* verse 
 .id-hero{background:linear-gradient(135deg,rgba(197,165,114,.22) 0%,rgba(var(--tint-rgb),.95) 65%);
   border:1.5px solid rgba(197,165,114,.28);border-radius:var(--r);padding:20px;margin-bottom:12px;}
 .id-top{display:flex;align-items:center;gap:14px;margin-bottom:16px;}
-.id-avatar{width:64px;height:64px;border-radius:20px;overflow:hidden;border:2px solid var(--gold);flex-shrink:0;}
+.id-avatar{width:64px;height:64px;border-radius:20px;overflow:hidden;border:2px solid var(--gold);flex-shrink:0;padding:5px;}
 .id-avatar svg{display:block;width:100%;height:100%;}
 .id-name{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:800;color:var(--text);line-height:1;}
 .id-level{display:inline-block;background:linear-gradient(135deg,var(--gold),#D4B87A);color:#16141E;
@@ -640,7 +640,7 @@ function fbLoadState(){
     if(snap.exists){
       var d=snap.data();
       // Merge saved fields onto defaults without clobbering local-only UI state (scr/tab/etc.)
-      ['streak','xp','xpMax','habits','goals','dayHabits'].forEach(function(k){
+      ['streak','xp','xpMax','habits','goals','dayHabits','identity'].forEach(function(k){
         if(d[k]!==undefined) S[k]=d[k];
       });
       render();
@@ -662,7 +662,7 @@ function fbListenState(){
   db.doc(window.APP_CONFIG.docIds.nolanState).onSnapshot(function(snap){
     if(!snap.exists) return;
     var d=snap.data();
-    ['streak','xp','xpMax','habits','goals','dayHabits'].forEach(function(k){
+    ['streak','xp','xpMax','habits','goals','dayHabits','identity'].forEach(function(k){
       if(d[k]!==undefined) S[k]=d[k];
     });
     if(S.scr==='main') render();
@@ -674,7 +674,7 @@ function fbSaveState(){
   clearTimeout(saveTimer);
   saveTimer=setTimeout(function(){
     db.doc(window.APP_CONFIG.docIds.nolanState).set({
-      streak:S.streak, xp:S.xp, xpMax:S.xpMax, habits:S.habits, goals:S.goals, dayHabits:S.dayHabits,
+      streak:S.streak, xp:S.xp, xpMax:S.xpMax, habits:S.habits, goals:S.goals, dayHabits:S.dayHabits, identity:S.identity,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     },{merge:true}).catch(function(e){console.error('Save state failed',e);});
   },400); // debounce so rapid taps don't spam writes
@@ -789,6 +789,7 @@ function toggleTheme(){
 var S={
   scr:'verse',tab:'home',goalsTab:'cat',curCat:'athletics',theme:getInitialTheme(),
   goalType:'once',freqN:3,hor:'yearly',picked:null,addedTitle:'',linkParent:null,
+  identity:{goal:'',obstacle:'',becoming:''},
   pin:'1234',
   verse:{text:'I can do all things through Christ who strengthens me.', ref:'Philippians 4:13 · NIV'},
   streak:7,xp:340,xpMax:3000,
@@ -1507,6 +1508,38 @@ function showDayHabitForm(id){
   draw();
 }
 
+function showIdentityForm(){
+  var ov=document.createElement('div');
+  ov.className='pin-overlay';
+  document.body.appendChild(ov);
+
+  ov.innerHTML='<div class="pin-modal" style="text-align:left;max-width:340px">'+
+    '<button class="pin-x" id="idfx">✕</button>'+
+    '<div style="font-family:Barlow Condensed,sans-serif;font-size:22px;font-weight:800;color:var(--text);margin-bottom:4px">Set Up My Identity</div>'+
+    '<div style="font-size:12px;color:var(--sub);margin-bottom:16px">Three quick questions. Answer honestly — no one\'s grading this.</div>'+
+    '<div style="font-size:11px;color:#C5A572;font-weight:800;margin-bottom:4px">What\'s one thing you want badly enough to actually work for?</div>'+
+    '<textarea id="idf-goal" class="f-area" style="margin-bottom:14px" placeholder="e.g. Make the N1 team">'+esc(S.identity.goal)+'</textarea>'+
+    '<div style="font-size:11px;color:#C41E3A;font-weight:800;margin-bottom:4px">What\'s standing between you and that?</div>'+
+    '<textarea id="idf-obstacle" class="f-area" style="margin-bottom:14px" placeholder="e.g. I don\'t put in extra work outside of practice">'+esc(S.identity.obstacle)+'</textarea>'+
+    '<div style="font-size:11px;color:#9B72CF;font-weight:800;margin-bottom:4px">Who do you want to be by the end of this year?</div>'+
+    '<textarea id="idf-becoming" class="f-area" style="margin-bottom:16px" placeholder="e.g. The guy who does the work when no one\'s watching">'+esc(S.identity.becoming)+'</textarea>'+
+    '<button class="btn btn-red" id="idf-save">Save</button>'+
+  '</div>';
+
+  document.getElementById('idfx').onclick=function(){ov.remove();};
+  document.getElementById('idf-save').onclick=function(){
+    var g=document.getElementById('idf-goal').value.trim();
+    var o=document.getElementById('idf-obstacle').value.trim();
+    var b=document.getElementById('idf-becoming').value.trim();
+    if(!g||!o||!b){ toast('Answer all three to save','#EF4444'); return; }
+    S.identity={goal:g,obstacle:o,becoming:b};
+    fbSaveState();
+    toast('Identity saved 💪','#30D158');
+    ov.remove();
+    showProfile();
+  };
+}
+
 function showHabitForm(id){
   var editing=!!id;
   var h=editing?S.habits.find(function(x){return x.id===id;}):null;
@@ -1835,15 +1868,25 @@ function showProfile(){
           '<div class="id-stat"><div class="id-stat-n" style="color:#30D158">12</div><div class="id-stat-l">Perfect days</div></div>'+
         '</div></div>'+
       '<div class="sec">Your Commitments</div>'+
-      '<div class="commit-card"><div class="commit-lbl" style="color:#C5A572">What you&rsquo;re working for</div>'+
-        '<div class="commit-q">What\'s one thing you want badly enough to actually work for?</div>'+
-        '<div class="commit-a">"Make the N1 team and earn real playing time."</div></div>'+
-      '<div class="commit-card"><div class="commit-lbl" style="color:#C41E3A">What&rsquo;s in the way</div>'+
-        '<div class="commit-q">What\'s standing between you and that?</div>'+
-        '<div class="commit-a">"I rely on talent and don\'t put in extra work outside of practice."</div></div>'+
-      '<div class="commit-card"><div class="commit-lbl" style="color:#9B72CF">Who you&rsquo;re becoming</div>'+
-        '<div class="commit-q">Who do you want to be by the end of this year?</div>'+
-        '<div class="commit-a">"The guy who does the work when no one is watching."</div></div>'+
+      (!S.identity.goal ?
+        '<div class="commit-card" style="text-align:center">'+
+          '<div style="font-size:32px;margin-bottom:8px">🎯</div>'+
+          '<div style="font-family:Barlow Condensed,sans-serif;font-size:16px;font-weight:800;color:var(--text);margin-bottom:6px">You haven&rsquo;t set this up yet</div>'+
+          '<div style="font-size:12px;color:var(--sub);margin-bottom:14px;line-height:1.5">Three quick questions that set the tone for your whole season.</div>'+
+          '<button class="btn btn-red" id="setup-identity-btn">Set Up My Identity</button>'+
+        '</div>'
+        :
+        '<div class="commit-card"><div class="commit-lbl" style="color:#C5A572">What you&rsquo;re working for</div>'+
+          '<div class="commit-q">What\'s one thing you want badly enough to actually work for?</div>'+
+          '<div class="commit-a">"'+esc(S.identity.goal)+'"</div></div>'+
+        '<div class="commit-card"><div class="commit-lbl" style="color:#C41E3A">What&rsquo;s in the way</div>'+
+          '<div class="commit-q">What\'s standing between you and that?</div>'+
+          '<div class="commit-a">"'+esc(S.identity.obstacle)+'"</div></div>'+
+        '<div class="commit-card"><div class="commit-lbl" style="color:#9B72CF">Who you&rsquo;re becoming</div>'+
+          '<div class="commit-q">Who do you want to be by the end of this year?</div>'+
+          '<div class="commit-a">"'+esc(S.identity.becoming)+'"</div></div>'+
+        '<button class="btn btn-ghost" id="setup-identity-btn" style="margin-top:4px">✏️ Edit My Identity</button>'
+      )+
       '<div style="height:16px"></div><div style="font-size:11px;color:#5E5A72;text-align:center;line-height:1.6">Season 1 · Aug–Dec 2025<br>Started Aug 1, 2025</div>'+
     '</div>'+
     '<div class="scroll fin" id="pf-playbook" style="display:none;padding-top:14px">'+
@@ -1898,6 +1941,7 @@ function showProfile(){
     chip.onclick=function(){chip.classList.toggle('on');chip.classList.toggle('off');};
   });
   var pinRow=document.getElementById('pf-pin-row'); if(pinRow) pinRow.onclick=function(){ov.remove();showPin();};
+  var idBtn=document.getElementById('setup-identity-btn'); if(idBtn) idBtn.onclick=function(){ov.remove();showIdentityForm();};
   document.getElementById('pf-close').onclick=function(){ov.remove();};
 }
 
