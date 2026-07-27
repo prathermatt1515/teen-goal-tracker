@@ -636,7 +636,7 @@ function fbLoadState(){
     if(snap.exists){
       var d=snap.data();
       // Merge saved fields onto defaults without clobbering local-only UI state (scr/tab/etc.)
-      ['streak','xp','xpMax','habits','goals'].forEach(function(k){
+      ['streak','xp','xpMax','habits','goals','dayHabits'].forEach(function(k){
         if(d[k]!==undefined) S[k]=d[k];
       });
       render();
@@ -658,7 +658,7 @@ function fbListenState(){
   db.doc(window.APP_CONFIG.docIds.nolanState).onSnapshot(function(snap){
     if(!snap.exists) return;
     var d=snap.data();
-    ['streak','xp','xpMax','habits','goals'].forEach(function(k){
+    ['streak','xp','xpMax','habits','goals','dayHabits'].forEach(function(k){
       if(d[k]!==undefined) S[k]=d[k];
     });
     if(S.scr==='main') render();
@@ -670,7 +670,7 @@ function fbSaveState(){
   clearTimeout(saveTimer);
   saveTimer=setTimeout(function(){
     db.doc(window.APP_CONFIG.docIds.nolanState).set({
-      streak:S.streak, xp:S.xp, xpMax:S.xpMax, habits:S.habits, goals:S.goals,
+      streak:S.streak, xp:S.xp, xpMax:S.xpMax, habits:S.habits, goals:S.goals, dayHabits:S.dayHabits,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     },{merge:true}).catch(function(e){console.error('Save state failed',e);});
   },400); // debounce so rapid taps don't spam writes
@@ -751,6 +751,13 @@ function setupPush(parentDocId){
   });
 }
 
+var DAY_NAMES=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+function todayName(){ return DAY_NAMES[new Date().getDay()]; }
+function todayLabel(){
+  var d=new Date();
+  return DAY_NAMES[d.getDay()]+', '+d.toLocaleDateString('en-US',{month:'long',day:'numeric'});
+}
+
 function getInitialTheme(){
   var saved=null;
   try{saved=localStorage.getItem('theme');}catch(e){}
@@ -788,6 +795,10 @@ var S={
     {id:'h4',lbl:'Homework before dinner',cat:'School',clr:'#4A90D9',done:false},
     {id:'h5',lbl:'Read 30 minutes',       cat:'Habits',clr:'#F59E0B',done:false},
     {id:'h6',lbl:'Practice my part',      cat:'Band',  clr:'#9B72CF',done:false},
+  ],
+  dayHabits:[
+    {id:'d1',lbl:'Take out the trash',   day:'Monday', clr:'#F59E0B',done:false},
+    {id:'d2',lbl:'Take out recycling',   day:'Thursday',clr:'#F59E0B',done:false},
   ],
   goals:[
     {id:'g1',t:'Make the N1 team',            pct:60, done:false,hor:'Yearly', cat:'athletics'},
@@ -853,15 +864,24 @@ function sMain(){
   return '<div style="display:flex;flex-direction:column;height:100%">'+body+nav()+'</div>';
 }
 
+function todaysChecklist(){
+  var todayDay=todayName();
+  var todays=S.dayHabits.filter(function(d){return d.day===todayDay;}).map(function(d){
+    return {id:d.id,lbl:d.lbl,cat:d.day,clr:d.clr,done:d.done,isDay:true};
+  });
+  return S.habits.concat(todays);
+}
+
 function sHome(){
-  var done=S.habits.filter(function(h){return h.done;}).length;
+  var list=todaysChecklist();
+  var done=list.filter(function(h){return h.done;}).length;
   var pct=Math.round(S.xp/S.xpMax*100);
 
-  var dots=S.habits.map(function(h){
+  var dots=list.map(function(h){
     return '<div class="hdot" style="background:'+(h.done?h.clr:'rgba(var(--overlay-rgb),.1)')+'"></div>';
   }).join('');
 
-  var chk=S.habits.map(function(h){
+  var chk=list.map(function(h){
     return '<div class="chk-row" data-tog="'+h.id+'">'+
       '<div class="chk-box'+(h.done?' done':'')+'" style="'+(h.done?'background:'+h.clr+';border-color:'+h.clr+';':'')+'">'+(h.done?'✓':'')+'</div>'+
       '<div class="row-lbl'+(h.done?' done':'')+'")>'+esc(h.lbl)+'</div>'+
@@ -873,7 +893,7 @@ function sHome(){
     '<div class="avatar" id="avatar-btn" style="cursor:pointer">'+logo(52)+'</div>'+
     '<div class="hdr-info">'+
       '<div class="hdr-name">Hey, Nolan! 👋</div>'+
-      '<div class="hdr-date">Thursday, July 16</div>'+
+      '<div class="hdr-date">'+todayLabel()+'</div>'+
       '<div class="hdr-badges" style="margin-top:5px">'+
         '<div class="badge badge-fire">🔥 '+S.streak+' day streak</div>'+
         '<div class="badge badge-xp">⚡ '+S.xp+' XP</div>'+
@@ -904,7 +924,7 @@ function sHome(){
       '</div>'+
     '</div>'+
 
-    '<div class="sec">Today&rsquo;s Missions — '+done+'/'+S.habits.length+' done</div>'+
+    '<div class="sec">Today&rsquo;s Missions — '+done+'/'+list.length+' done</div>'+
     '<div class="chk-list">'+chk+'</div>'+
 
     '<div class="hab-strip" data-tab="habits">'+
@@ -914,7 +934,7 @@ function sHome(){
           '<div class="hab-lbl">Daily Habits</div>'+
           '<div class="hab-sub">Tap to manage your daily habits</div>'+
         '</div>'+
-        '<div class="hab-pct">'+Math.round(done/S.habits.length*100)+'%</div>'+
+        '<div class="hab-pct">'+(list.length?Math.round(done/list.length*100):0)+'%</div>'+
       '</div>'+
       '<div class="hab-dots">'+dots+'</div>'+
     '</div>'+
@@ -1072,16 +1092,26 @@ function sCatDetail(){
 }
 
 function sHabits(){
-  var done=S.habits.filter(function(h){return h.done;}).length;
-  var chk=S.habits.map(function(h){
+  var list=todaysChecklist();
+  var done=list.filter(function(h){return h.done;}).length;
+  var chk=list.map(function(h){
     return '<div class="chk-row" data-tog="'+h.id+'">'+
       '<div class="chk-box'+(h.done?' done':'')+'" style="'+(h.done?'background:'+h.clr+';border-color:'+h.clr+';':'')+'">'+(h.done?'✓':'')+'</div>'+
       '<div class="row-lbl'+(h.done?' done':'')+'")>'+esc(h.lbl)+'</div>'+
+      (h.isDay?'<div class="row-cat" style="color:'+h.clr+'">'+h.cat+'</div>':'')+
     '</div>';
   }).join('');
   var manage=S.habits.map(function(h){
     return '<div class="hab-manage" data-edithab="'+h.id+'" style="cursor:pointer"><span style="flex:1;font-size:13px;color:var(--text)">'+esc(h.lbl)+'</span>'+
       '<span style="font-size:9px;color:var(--muted);font-family:Barlow Condensed,sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:.06em">'+esc(h.cat||'Daily')+'</span>'+
+      '<span class="g-chev" style="margin-left:8px">›</span></div>';
+  }).join('');
+  var todayDay=todayName();
+  var dayManage=S.dayHabits.map(function(d){
+    var isToday=d.day===todayDay;
+    return '<div class="hab-manage" data-editdayhab="'+d.id+'" style="cursor:pointer;'+(isToday?'':'opacity:.55')+'">'+
+      '<span style="flex:1;font-size:13px;color:var(--text)">'+esc(d.lbl)+'</span>'+
+      '<span style="font-size:9px;color:'+d.clr+';font-family:Barlow Condensed,sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:.06em">'+d.day+(isToday?' · Today':'')+'</span>'+
       '<span class="g-chev" style="margin-left:8px">›</span></div>';
   }).join('');
 
@@ -1092,13 +1122,13 @@ function sHabits(){
     '<div class="scroll fin">'+
       '<div class="hero-sec">'+
         '<div class="hero-sub">The daily things that build a great life</div>'+
-        '<div><span style="font-family:Barlow Condensed,sans-serif;font-size:28px;font-weight:800;color:var(--text)">'+done+'/'+S.habits.length+'</span><span style="font-size:11px;color:var(--muted);margin-left:5px">done today</span></div>'+
+        '<div><span style="font-family:Barlow Condensed,sans-serif;font-size:28px;font-weight:800;color:var(--text)">'+done+'/'+list.length+'</span><span style="font-size:11px;color:var(--muted);margin-left:5px">done today</span></div>'+
       '</div>'+
       '<div class="sec">Today</div>'+
       '<div class="chk-list" style="margin-bottom:20px">'+chk+'</div>'+
       '<div class="sec">Day-Specific</div>'+
-      '<div class="hab-manage" style="opacity:.4"><span style="flex:1;font-size:13px;color:var(--text)">Take out the trash</span><span style="font-size:9px;color:#F59E0B;font-family:Barlow Condensed,sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:.06em">Monday</span></div>'+
-      '<div class="hab-manage" style="opacity:.4"><span style="flex:1;font-size:13px;color:var(--text)">Take out recycling</span><span style="font-size:9px;color:#F59E0B;font-family:Barlow Condensed,sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:.06em">Thursday</span></div>'+
+      dayManage+
+      '<button class="btn btn-ghost" id="add-dayhabit-btn" style="margin-top:8px;margin-bottom:8px">+ Add Day-Specific Habit</button>'+
       '<div class="sec" style="margin-top:20px">Manage</div>'+manage+
       '<div class="gap2"></div>'+
       '<button class="btn" id="add-habit-btn" style="background:linear-gradient(135deg,#F59E0B,#E08C00);color:#16141E;font-family:Barlow Condensed,sans-serif;font-size:17px;font-weight:800;letter-spacing:.06em">+ Add Habit</button>'+
@@ -1315,6 +1345,91 @@ function sParentDash(){
       '<div class="gap"></div>'+
       '<button class="btn btn-ghost" id="change-pin-btn">🔑 Change PIN</button>'+
     '</div>'+nav()+'</div>';
+}
+
+function showDayHabitForm(id){
+  var editing=!!id;
+  var d=editing?S.dayHabits.find(function(x){return x.id===id;}):null;
+  var swatches=[
+    {clr:'#C5A572',n:'Gold'},{clr:'#C41E3A',n:'Red'},{clr:'#4A90D9',n:'Blue'},
+    {clr:'#9B72CF',n:'Purple'},{clr:'#F59E0B',n:'Amber'},{clr:'#30D158',n:'Green'}
+  ];
+  var pickedClr=(d&&d.clr)||swatches[4].clr;
+  var pickedDay=(d&&d.day)||todayName();
+
+  var ov=document.createElement('div');
+  ov.className='pin-overlay';
+  document.body.appendChild(ov);
+
+  function draw(){
+    ov.innerHTML='<div class="pin-modal" style="text-align:left;max-width:340px">'+
+      '<button class="pin-x" id="dhfx">✕</button>'+
+      '<div style="font-family:Barlow Condensed,sans-serif;font-size:22px;font-weight:800;color:var(--text);margin-bottom:14px">'+(editing?'Edit Day-Specific Habit':'Add Day-Specific Habit')+'</div>'+
+      '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">What&rsquo;s the habit?</div>'+
+      '<input id="dhf-lbl" class="f-area" style="min-height:auto;height:44px;margin-bottom:14px" placeholder="e.g. Take out the trash" value="'+esc(d?d.lbl:'')+'">'+
+      '<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Which day?</div>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px" id="dhf-days">'+
+        DAY_NAMES.map(function(dn){
+          var on=dn===pickedDay;
+          return '<div data-day="'+dn+'" style="padding:6px 12px;border-radius:20px;font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:800;cursor:pointer;'+
+            (on?'background:var(--gold);color:#16141E':'background:var(--card2);color:var(--sub)')+'">'+dn.slice(0,3)+'</div>';
+        }).join('')+
+      '</div>'+
+      '<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Color</div>'+
+      '<div style="display:flex;gap:8px;margin-bottom:18px" id="dhf-swatches">'+
+        swatches.map(function(s){
+          return '<div data-clr="'+s.clr+'" style="width:32px;height:32px;border-radius:50%;background:'+s.clr+';cursor:pointer;'+
+            'border:3px solid '+(s.clr===pickedClr?'var(--text)':'transparent')+'"></div>';
+        }).join('')+
+      '</div>'+
+      '<button class="btn btn-red" id="dhf-save" style="margin-bottom:8px">'+(editing?'Save Changes':'Add Habit')+'</button>'+
+      (editing?'<button class="btn btn-ghost" id="dhf-delete">🗑 Delete Habit</button>':'')+
+    '</div>';
+
+    document.getElementById('dhfx').onclick=function(){ov.remove();};
+    ov.querySelectorAll('[data-clr]').forEach(function(sw){
+      sw.onclick=function(){
+        pickedClr=sw.dataset.clr;
+        ov.querySelectorAll('[data-clr]').forEach(function(s2){
+          s2.style.border='3px solid '+(s2.dataset.clr===pickedClr?'var(--text)':'transparent');
+        });
+      };
+    });
+    ov.querySelectorAll('[data-day]').forEach(function(db){
+      db.onclick=function(){
+        pickedDay=db.dataset.day;
+        ov.querySelectorAll('[data-day]').forEach(function(d2){
+          var on=d2.dataset.day===pickedDay;
+          d2.style.background=on?'var(--gold)':'var(--card2)';
+          d2.style.color=on?'#16141E':'var(--sub)';
+        });
+      };
+    });
+    document.getElementById('dhf-save').onclick=function(){
+      var lbl=document.getElementById('dhf-lbl').value.trim();
+      if(!lbl) return;
+      if(editing){
+        d.lbl=lbl;d.day=pickedDay;d.clr=pickedClr;
+        toast('Habit updated ✓','#30D158');
+      }else{
+        S.dayHabits.push({id:'d'+Date.now(),lbl:lbl,day:pickedDay,clr:pickedClr,done:false});
+        toast('Habit added 💪','#30D158');
+      }
+      fbSaveState();
+      ov.remove();
+      render();
+    };
+    var del=document.getElementById('dhf-delete');
+    if(del) del.onclick=function(){
+      if(!confirm('Delete this habit?')) return;
+      S.dayHabits=S.dayHabits.filter(function(x){return x.id!==id;});
+      fbSaveState();
+      toast('Habit deleted','#EF4444');
+      ov.remove();
+      render();
+    };
+  }
+  draw();
 }
 
 function showHabitForm(id){
@@ -1697,17 +1812,22 @@ function bind(){
   app.querySelectorAll('[data-edithab]').forEach(function(el){
     el.onclick=function(){showHabitForm(el.dataset.edithab);};
   });
+  var addDayHabitBtn=document.getElementById('add-dayhabit-btn');
+  if(addDayHabitBtn) addDayHabitBtn.onclick=function(){showDayHabitForm(null);};
+  app.querySelectorAll('[data-editdayhab]').forEach(function(el){
+    el.onclick=function(){showDayHabitForm(el.dataset.editdayhab);};
+  });
 
   app.querySelectorAll('[data-tog]').forEach(function(el){
     el.onclick=function(){
       var id=el.dataset.tog;
-      var h=S.habits.find(function(x){return x.id===id;});
+      var h=S.habits.find(function(x){return x.id===id;})||S.dayHabits.find(function(x){return x.id===id;});
       if(!h) return;
       h.done=!h.done;
       if(h.done){
         S.xp+=5;
         toast('+5 XP · '+h.lbl,h.clr);
-        if(S.habits.every(function(x){return x.done;})){
+        if(todaysChecklist().every(function(x){return x.done;})){
           setTimeout(function(){S.xp+=20;toast('🎉 All missions done! +20 XP','#30D158');},1900);
         }
       }
