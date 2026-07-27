@@ -1,0 +1,36 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // The app signs in anonymously on load (see fbInit() in index.html),
+    // so "authenticated" here just means "opened through the app" rather
+    // than "is Matt or Jen specifically" — anonymous auth doesn't tell us
+    // who's holding the phone. That's an acceptable line for a private,
+    // unlisted family app: it stops random internet traffic and search
+    // crawlers from reading or writing your Firestore data, which is the
+    // realistic threat for a GitHub Pages app. It does NOT stop someone
+    // who has the app's URL from reading Nolan's state or the PIN doc.
+    //
+    // If you want real separation between "Nolan's device" and "a
+    // parent's device" later, swap anonymous auth for real sign-in
+    // (e.g. Google sign-in restricted to your family's email addresses)
+    // and reference request.auth.token.email in these rules instead.
+
+    match /users/{userId} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /settings/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /parents/{parentId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Everything else: closed by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
